@@ -99,8 +99,9 @@ or browser Google authentication is used.
 Troubleshooting: check the enabled API, Viewer sharing, key path, spreadsheet ID,
 tab/range, unique headers, mapping, and displayed date/time formats. Raw exception
 messages and source content are deliberately excluded from browser errors and logs.
-Logs report the exception class. Real connectivity has not been verified without
-the user's real sheet and service account.
+Logs report the exception class. Authenticated live reads have been verified on
+the original workstation. A new clone still needs its own local key path and private
+configuration; credentials and real sheet settings are never distributed through Git.
 
 ## Test on your phone (same trusted Wi-Fi)
 ```powershell

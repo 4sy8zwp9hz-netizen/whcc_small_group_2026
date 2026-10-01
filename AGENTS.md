@@ -45,4 +45,5 @@ fictional data in tests/fixtures. Never commit the real sheet ID or copied rows.
 The school-year rollover and start time must be explicit. Keep source dates intact;
 only apply leader-confirmed off-date overrides. Do not edit the Google Sheet unless
 asked. Any local .env.google and private/ notes are ignored and do not transfer by
-clone. Live Google API verification still needs the user's server-side credentials.
+clone. Live Google API reads were verified on the original workstation. A fresh
+clone still needs the user's server-side credentials and private configuration.

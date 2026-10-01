@@ -26,8 +26,12 @@ No paid services or public app deployment are authorized.
 - Inspected the supplied calendar read-only and prepared ignored .env.google and
   private/GOOGLE_SETUP.md files locally. No real sheet ID, rows, or private connection
   values are tracked. These ignored files must be recreated privately at home.
-- Verified the private configuration loads with Flask's routes command; live reads
-  still require a service-account key and Viewer access.
+- Verified authenticated Google Sheets reads using the owner's externally stored
+  service-account key. Both meeting views returned HTTP 200 using live data.
+- Verified 60-second cache reuse, the leader-confirmed off-week override, stale
+  fallback after a simulated refresh failure, and recovery with another live read.
+- Key contents, local key path, spreadsheet ID, and real rows remain outside Git.
+  The key is referenced by ignored .env.google and was not copied into the project.
 - Rechecked the calendar UI with fictional paired assignments at 375 and 1440 px,
   with no horizontal overflow.
 - Browser inspection at 375x812 and 1440x1000. Upcoming and past pages checked;
@@ -52,7 +56,7 @@ No paid services or public app deployment are authorized.
 - Explicit off-date overrides are local configuration and should be reconciled
   after the owner corrects the source sheet.
 - No database, user accounts, RSVP, reminders, payments, or prayer requests.
-- Actual Google connectivity and a physical phone test remain unverified.
+- Authenticated Google connectivity is verified locally. A physical phone test remains.
 
 ## Repository and handoff
 Repository: https://github.com/4sy8zwp9hz-netizen/whcc_small_group_2026
@@ -67,8 +71,8 @@ authentication; future pushes from home require authenticating the personal acco
 No website has been deployed. Public source code is not permission to publish real data.
 
 ## Remaining decisions and next tasks
-1. Supply a personal service account and grant it Viewer access; set the key path
-   in an ignored .env.google and verify authenticated live reads and failure recovery.
+1. On another computer, supply the service-account key outside the repository and
+   set its local path in ignored .env.google. Recheck authenticated reads there.
 2. Recreate the private sheet configuration at home using the supplied sheet and
    local private notes. Do not publish these values through Git.
 3. Confirm meeting locations separately; a host assignment is not an address.
