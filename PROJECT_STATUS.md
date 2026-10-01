@@ -18,7 +18,7 @@ No paid services or public app deployment are authorized.
 - Process-local 60-second cache, safe stale fallback, last-successful timestamp,
   useful no-data error, and atomic validation before replacing cached data.
 - Git exclusions, .env.example, Windows/Wi-Fi instructions, future Render command.
-- 44 automated tests passed on Python 3.12.14. Python compilation passed.
+- 74 automated tests passed on Python 3.12.14. Python compilation passed.
 - Added an optional school-year calendar reader with two-row assignments, header
   mapping, merged event titles, off weeks, optional notes, and footer exclusion.
 - Added configurable leader-confirmed off-date overrides and visible warnings
@@ -40,11 +40,29 @@ No paid services or public app deployment are authorized.
 - Source and tracked-file allowlist reviewed for secrets/unrelated content.
   Only original project code, documentation, and fictional sample data are included.
 
+## Household attendance update
+- Compact top card with expandable assignments and notes.
+- Household setup once; one-tap all/none and individual checkbox autosave.
+- Counts and attendee names, clear-response control, and non-JavaScript fallback.
+- Persistent signed cookie; server-side SQLite and signing secret excluded from Git.
+- CSRF checks, escaped names, membership validation, and transactional updates.
+- Tests reject stale, canceled, past, ambiguous, and missing-meeting writes.
+- Browser checks verified initial setup, all going, child opt-out, not going, and
+  cookie/response persistence after reload. Fixed a browser-discovered form action
+  property collision. Test households use a separate fictional preview database.
+- New-layout browser checks: 375-pixel phone viewport (360-pixel content width)
+  and desktop (1265-pixel content width), with no horizontal overflow. The top
+  card starts about 63 pixels from the top on phone. Expanded past assignments
+  also fit the phone width. Physical phone testing remains pending.
+- Production still needs website access decisions, durable storage, HTTPS cookie
+  settings, and a stable signing secret. No public app deployment was performed.
+
 ## Assumptions and tradeoffs
 - Default required assignments: discussion leader, host, food, childcare.
 - Topic, location, notes, and status are optional; blank location is unconfirmed.
 - Meetings become past at their start time (no end time provided).
-- Next card intentionally repeats the meeting from the full upcoming list.
+- This week is featured above navigation, including off weeks or already-started
+  gatherings. Otherwise the next gathering is featured; it is not duplicated.
 - Sample dates are fixed in September-November 2026.
 - Refreshes happen on page requests; cache does not survive process restarts.
 - Entire refresh fails if any populated row is malformed, preserving last-good data.
@@ -55,7 +73,13 @@ No paid services or public app deployment are authorized.
   source columns are discarded; only selected schedule fields are rendered.
 - Explicit off-date overrides are local configuration and should be reconciled
   after the owner corrects the source sheet.
-- No database, user accounts, RSVP, reminders, payments, or prayer requests.
+- The owner expanded scope to household attendance: one remembered household,
+  everyone initially selected, individual opt-outs, and All going / Not going.
+- SQLite stores attendance separately; the Google Sheet remains read-only.
+- No user accounts, reminders, payments, or prayer requests.
+- Cookies identify a browser, not a verified person. Clearing cookies or switching
+  devices can create duplicate households. Forgetting preserves old responses.
+- Roster editing, household recovery, and leader correction tools remain future work.
 - Authenticated Google connectivity is verified locally. A physical phone test remains.
 
 ## Repository and handoff
@@ -79,4 +103,6 @@ No website has been deployed. Public source code is not permission to publish re
 4. Decide website access and acceptable displayed information before sharing real
    group data online. A private sheet does not make the website private.
 5. Test on a physical phone on trusted Wi-Fi.
-6. Once explicitly authorized, plan Render secrets, access enforcement, and deployment.
+6. Decide household recovery, roster editing, and leader correction before wider use.
+7. Once explicitly authorized, plan Render secrets, durable attendance storage,
+   access enforcement, and deployment.

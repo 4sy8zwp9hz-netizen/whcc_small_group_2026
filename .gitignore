@@ -20,3 +20,10 @@ data/*
 !data/sample.csv
 .DS_Store
 Thumbs.db
+
+# Attendance data and local signing secrets
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*

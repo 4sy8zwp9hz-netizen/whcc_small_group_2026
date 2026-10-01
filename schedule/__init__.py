@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -18,6 +18,16 @@ def create_app(test_config=None, source=None, now=None):
     load_dotenv(ROOT / ".env", override=False)
     app = Flask(__name__)
     app.config.from_mapping(
+        SECRET_KEY=os.getenv("SECRET_KEY") or None,
+        RSVP_DATABASE=os.getenv("RSVP_DATABASE", "private/attendance.sqlite3"),
+        RSVP_SECRET_FILE=os.getenv("RSVP_SECRET_FILE", "private/session.key"),
+        SESSION_COOKIE_NAME=os.getenv("RSVP_COOKIE_NAME", "whcc_household"),
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
+        SESSION_COOKIE_SECURE=os.getenv("COOKIE_SECURE", "false").lower() == "true",
+        PERMANENT_SESSION_LIFETIME=timedelta(days=365),
+        SESSION_REFRESH_EACH_REQUEST=False,
+        MAX_CONTENT_LENGTH=16384,
         DATA_SOURCE=os.getenv("DATA_SOURCE", "csv"),
         SHEET_LAYOUT=os.getenv("SHEET_LAYOUT", "table"),
         CALENDAR_START_YEAR=int(os.getenv("CALENDAR_START_YEAR", "0")),
@@ -42,6 +52,8 @@ def create_app(test_config=None, source=None, now=None):
     )
     if test_config:
         app.config.update(test_config)
+    if app.testing and (not test_config or "RSVP_DATABASE" not in test_config):
+        app.config["RSVP_DATABASE"] = ":memory:"
     mapping = dict(zip(FIELDS, FIELDS))
     overrides = json.loads(app.config["FIELD_MAPPING_JSON"])
     if not isinstance(overrides, dict) or any(
@@ -97,6 +109,9 @@ def create_app(test_config=None, source=None, now=None):
         ttl=app.config["CACHE_SECONDS"], now=now,
     )
     app.extensions["schedule_cache"] = cache
+    from .attendance import Attendance
+    attendance_service = Attendance(app, ROOT, cache, now)
+    app.extensions["attendance"] = attendance_service
 
     @app.after_request
     def response_headers(response):
@@ -120,8 +135,23 @@ def create_app(test_config=None, source=None, now=None):
     def schedule_page(past=False):
         snapshot = cache.get()
         meetings, next_meeting = select_meetings(snapshot.meetings or (), now(), past)
+        week_start = now().date() - timedelta(days=now().weekday())
+        this_week = [meeting for meeting in (snapshot.meetings or ())
+                     if week_start <= meeting.starts_at.date() < week_start + timedelta(days=7)]
+        featured = None
+        featured_label = "Next gathering"
+        if not past:
+            if this_week:
+                featured = next((m for m in this_week if m.starts_at >= now()), this_week[-1])
+                featured_label = "This week"
+            else:
+                featured = next_meeting or (meetings[0] if meetings else None)
+        remaining = [meeting for meeting in meetings if meeting is not featured]
+        attendance_context = attendance_service.context(snapshot.meetings or (), snapshot)
         return render_template(
             "schedule.html", snapshot=snapshot, meetings=meetings,
+            featured_meeting=featured, featured_label=featured_label,
+            remaining_meetings=remaining, **attendance_context,
             next_meeting=next_meeting, past=past, labels=LABELS,
             required=required, sample=app.config["DATA_SOURCE"] == "csv",
         ), 503 if snapshot.meetings is None else 200

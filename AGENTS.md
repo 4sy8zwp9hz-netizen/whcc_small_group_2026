@@ -4,10 +4,11 @@
 Personal proof of concept for West Houston Christian Church, led by the owner,
 his wife Diana, and another member. This is original code in a separate repository.
 Never copy company code, configurations, credentials, private data, or chat archives.
-Google Sheets remains the source of truth; this app is read-only.
+Google Sheets remains the schedule source of truth; its adapter is read-only.
+Household attendance, explicitly requested by the owner, is stored separately in SQLite.
 
 Use Flask, server-rendered Jinja templates, and plain responsive CSS. No frontend
-build system. No accounts, RSVP, reminders, payments, prayer requests, or public
+build system. No accounts, reminders, payments, prayer requests, or public
 deployment without a new explicit request. Decide website access before using real
 group information online. A private sheet does not make the website private.
 
@@ -16,6 +17,9 @@ group information online. A private sheet does not make the website private.
 - All meeting times use America/Chicago. Require dates and times; do not invent them.
 - Normalize both adapters through the same parser and last-good cache.
 - Keep configuration in environment variables, never hardcode real sheet IDs or people.
+- Attendance uses a signed browser cookie, CSRF checks, validated household members,
+  and transactional updates. Cookies remember a household; they do not authenticate it.
+- Keep attendance databases and session secrets under ignored private/ paths.
 - Keep template autoescaping enabled and show safe errors rather than raw exceptions.
 - Required assignments are configurable; optional blanks are not errors.
 - Never commit .env, credential files, local caches, virtual environments, or private data.
@@ -35,7 +39,10 @@ git diff --cached
 Inspect / and /past at 375 px and desktop width after layout changes. Check long
 content for horizontal overflow; keep controls keyboard-accessible.
 Tests cover chronology, next gathering, cancellation, blanks, cache TTL, stale/error
-states, mapping, DST, escaping, and the read-only Google adapter contract.
+states, mapping, DST, escaping, and the read-only Google adapter contract. Attendance
+tests cover cookies, individual selections, duplicate responses, CSRF, persistence,
+and rejected writes for stale/canceled/past/ambiguous meetings. Exercise real browser
+submissions as well: server-only tests cannot validate JavaScript form behavior.
 Real Google connectivity requires separately supplied credentials and sheet access.
 
 ## Calendar layout

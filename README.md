@@ -1,6 +1,6 @@
 # WHCC small group schedule
 
-A mobile-friendly, read-only Flask schedule for a West Houston Christian Church
+A mobile-friendly Flask schedule with quick household attendance for a West Houston Christian Church
 small group. Leaders continue editing Google Sheets. The app starts immediately
 with fictional CSV data and needs no Google credentials in demo mode.
 
@@ -26,9 +26,11 @@ notepad .env
 The app loads only the project's .env; existing environment variables take precedence.
 
 ## Screens and behavior
-- A highlighted next gathering excludes canceled meetings.
-- Upcoming and past lists are chronological. The next gathering is also included
-  in the complete upcoming list, intentionally.
+- This week's card comes first, directly below the compact header. It also shows
+  an off week or a gathering that has already started, with attendance closed.
+  With no entry this week, the next gathering is featured instead.
+- Upcoming and past lists are chronological. The featured meeting is not duplicated.
+- Assignments and notes expand on demand to conserve phone space.
 - A meeting becomes past at its start time; no duration/end time was supplied.
 - Canceled meetings retain any recorded details but do not request missing assignments.
 - Discussion leader, host, food, and childcare default to required assignments.
@@ -44,6 +46,43 @@ The app loads only the project's .env; existing environment variables take prece
   a successful empty schedule.
 - Cache is in memory per process. Restarting loses the last-good snapshot.
   There is intentionally no disk cache of private data.
+
+
+## Quick household attendance
+Enter a household name and its members once (comma-separated names, up to 20).
+Choose **All going** or **Not going** to save. On later visits, this browser
+remembers the household. Everyone starts checked for each unanswered gathering;
+nothing is counted until someone submits or changes a checkbox. Uncheck anyone
+who cannot come and the change saves immediately. Without JavaScript, use
+**Save selection**. The attendance summary expands to show who is coming.
+
+Responses are per gathering. Repeated taps update the same response. **Clear
+response** removes that gathering's answer while keeping the remembered household.
+Canceled, past, ambiguous, or stale schedules reject attendance changes.
+
+A signed, HttpOnly, SameSite=Lax cookie remembers a random household identifier
+for up to a year. Names and responses stay in the server's SQLite database, not
+the cookie or Google Sheet. The default database is private/attendance.sqlite3;
+a locally generated signing secret persists in private/session.key. Both are
+ignored by Git. Back up these files privately together to preserve local attendance.
+Cloning source code does not transfer attendance or remembered households.
+
+This is a prototype without verified identities or cross-device household recovery.
+Another browser, cleared cookies, or **Forget this household on this browser**
+creates a new identity and may produce a duplicate household. Forgetting preserves
+existing responses but loses the ability to edit them from that browser. There is
+no roster-editing UI yet. Website access, recovery, and leader correction tools must
+be decided before broader use with real household information.
+
+Optional environment settings:
+```dotenv
+RSVP_DATABASE=private/attendance.sqlite3
+RSVP_SECRET_FILE=private/session.key
+RSVP_COOKIE_NAME=whcc_household
+COOKIE_SECURE=false
+```
+For HTTPS hosting, set COOKIE_SECURE=true and provide a long random SECRET_KEY as
+a server secret. Keep it stable across restarts. Do not commit its value.
 
 ## Data and column mapping
 The default headers are:
@@ -134,6 +173,10 @@ For a future Linux Render web service:
 - Build command: `pip install -r requirements.txt`
 - Start command: `gunicorn --workers 1 --threads 4 --bind 0.0.0.0:$PORT app:app`
 - Configure a supported Python 3.12+ runtime and environment values.
+- Set COOKIE_SECURE=true and a persistent random SECRET_KEY in server secrets.
+- Attendance needs durable storage: set RSVP_DATABASE to a persistent disk path
+  for a single instance, or migrate to a managed database before scaling. Default
+  ephemeral storage can lose attendance during redeploys. No disk was purchased.
 - Mount the Google service-account key as a secret file; point
   GOOGLE_APPLICATION_CREDENTIALS to its absolute server path.
 - One worker maintains one shared process cache; multiple workers/instances have
@@ -143,7 +186,9 @@ For a future Linux Render web service:
 
 References: [Render Flask guide](https://render.com/docs/deploy-flask),
 [Flask Gunicorn guidance](https://flask.palletsprojects.com/en/stable/deploying/gunicorn/),
-[Google Sheets scopes](https://developers.google.com/workspace/sheets/api/scopes).
+[Google Sheets scopes](https://developers.google.com/workspace/sheets/api/scopes),
+[Render persistent disks](https://render.com/docs/disks),
+[Flask cookie security](https://flask.palletsprojects.com/en/stable/web-security/).
 
 ## Continue with Codex
 Read AGENTS.md, README.md, and PROJECT_STATUS.md first. Run the validation commands,

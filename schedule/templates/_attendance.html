@@ -1,0 +1,56 @@
+{% set key = attendance_key(meeting) %}
+{% set summary = attendance[key] %}
+<section class="rsvp-panel" data-meeting="{{ key }}" aria-label="Household attendance">
+  {% if can_respond(meeting) %}
+  <form class="rsvp-form" action="{{ url_for('save_attendance', meeting_id=key) }}" method="post">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% if household %}
+      <p class="rsvp-title">{{ household.name }} <span>· Your household</span></p>
+      <fieldset class="member-choices">
+        <legend>Who’s coming?</legend>
+        {% for member in household.members %}
+        <label class="member-choice">
+          <input type="checkbox" name="attending" value="{{ member.id }}"
+                 {% if summary.own is none or member.id in summary.own %}checked{% endif %}>
+          <span>{{ member.name }}</span>
+        </label>
+        {% endfor %}
+      </fieldset>
+      <p class="rsvp-hint">{% if summary.own is none %}Not sent yet. Everyone starts selected.{% else %}Saved. Tap a name to change who’s coming.{% endif %}</p>
+    {% else %}
+      <p class="rsvp-title">Is your household coming?</p>
+      <div class="household-setup">
+        <label>Your household<input name="household" autocomplete="off" maxlength="60" placeholder="e.g. The Riveras" required></label>
+        <label>People in your household<input name="people" autocomplete="off" maxlength="1000" placeholder="e.g. Alex, Sam, Kai" required></label>
+      </div>
+      <p class="rsvp-hint">Enter names once. This browser remembers your household.</p>
+    {% endif %}
+    <div class="rsvp-actions">
+      <button name="action" value="all" class="rsvp-choice" aria-pressed="{{ 'true' if household and summary.own is not none and summary.own|length == household.members|length else 'false' }}"><span aria-hidden="true">✓</span> All going</button>
+      <button name="action" value="none" class="rsvp-choice" aria-pressed="{{ 'true' if summary.own == [] else 'false' }}"><span aria-hidden="true">×</span> Not going</button>
+    </div>
+    {% if household %}
+    <div class="rsvp-secondary">
+      <button name="action" value="custom" class="manual-save text-button">Save selection</button>
+      {% if summary.own is not none %}<button name="action" value="clear" class="text-button">Clear response</button>{% endif %}
+    </div>
+    {% endif %}
+    <p class="rsvp-error" role="alert"></p>
+  </form>
+  {% elif not meeting.canceled %}
+  <p class="rsvp-hint">Attendance is closed for past meetings, or unavailable while this schedule needs confirmation.</p>
+  {% endif %}
+  <details class="attendance-summary">
+    <summary>{{ summary.people }} {{ 'person' if summary.people == 1 else 'people' }} going <span>· {{ summary.going|length }} {{ 'household' if summary.going|length == 1 else 'households' }}</span></summary>
+    {% if summary.going %}
+    <ul>{% for group in summary.going %}<li><strong>{{ group.household }}</strong>: {{ group.names|join(', ') }}</li>{% endfor %}</ul>
+    {% else %}<p>No one has confirmed yet.</p>{% endif %}
+    {% if summary.not_going %}<p>{{ summary.not_going }} {{ 'household is' if summary.not_going == 1 else 'households are' }} not going.</p>{% endif %}
+  </details>
+  {% if household %}
+  <form class="forget-form" action="{{ url_for('forget_household') }}" method="post">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="text-button">Forget this household on this browser</button>
+  </form>
+  {% endif %}
+</section>

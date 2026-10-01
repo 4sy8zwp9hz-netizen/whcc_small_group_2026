@@ -5,29 +5,41 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ 'Past meetings' if past else 'Small group schedule' }} · WHCC</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="{{ url_for('static', filename='attendance.js') }}" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to schedule</a>
 <header class="site-header">
   <div class="brand-mark" aria-hidden="true">W</div>
-  <div><p class="eyebrow">West Houston Christian Church</p><p class="brand-title">Life together.</p></div>
+  <div><p class="eyebrow">West Houston Christian Church</p><h1>Small group</h1></div>
 </header>
+{% macro card(meeting, featured=false) %}
+<article class="meeting {{ 'featured' if featured else '' }} {{ 'canceled' if meeting.canceled else '' }}" id="meeting-{{ attendance_key(meeting) }}">
+  <div class="card-top">
+    <p class="eyebrow">{{ featured_label if featured else ('Special event' if meeting.special_event else 'Meeting') }}</p>
+    {% if meeting.canceled %}<span class="badge">{{ "No meeting" if meeting.special_event else "Canceled" }}</span>{% endif %}
+  </div>
+  <h{{ '2' if featured else '3' }}>{{ meeting.topic or 'Small group gathering' }}</h{{ '2' if featured else '3' }}>
+  <p class="date"><time datetime="{{ meeting.starts_at.isoformat() }}">{{ meeting.starts_at|meeting_date }}</time></p>
+  <p class="when">{{ meeting.starts_at|meeting_time }} · {{ meeting.location or 'Location to be confirmed' }}</p>
+  {% if meeting.canceled %}<p class="cancel-note">This gathering will not take place.</p>{% endif %}
+  {% if meeting.date_conflict %}<p class="notes"><strong>Please confirm this date</strong>More than one entry is listed for this date. Confirm plans with a group leader.</p>{% endif %}
+  {% if not meeting.canceled %}{% include "_attendance.html" %}{% endif %}
+  <details class="meeting-details">
+    <summary>Assignments{% if meeting.notes %} & notes{% endif %}</summary>
+    <dl class="assignments">
+      {% for field, label in labels.items() %}
+        {% set value = meeting|attr(field) %}
+        {% if value or (not meeting.canceled and not meeting.special_event and field in required) %}
+        <div><dt>{{ label }}{{ ' (previously planned)' if meeting.canceled else '' }}</dt><dd>{% if value %}{{ value }}{% else %}<span class="missing">Needs assignment</span>{% endif %}</dd></div>
+        {% endif %}
+      {% endfor %}
+    </dl>
+    {% if meeting.notes %}<p class="notes"><strong>Good to know</strong>{{ meeting.notes }}</p>{% endif %}
+  </details>
+</article>
+{% endmacro %}
 <main id="main">
-  <div class="intro"><p class="eyebrow">Small group · Schedule</p>
-    <h1>A place to gather.<br>A week to look forward to.</h1>
-    <p class="subtle">Our next gathering, and the people helping make it happen.</p>
-  </div>
-  {% if sample %}<p class="demo">Fictional demo schedule · Names, places, and assignments are examples.</p>{% endif %}
-  <nav aria-label="Meeting views">
-    <a href="/" {% if not past %}aria-current="page"{% endif %}>Upcoming</a>
-    <a href="/past" {% if past %}aria-current="page"{% endif %}>Past meetings</a>
-  </nav>
-  <div class="refresh">
-    <p>{% if snapshot.last_success %}Last successful refresh:
-      <time datetime="{{ snapshot.last_success.isoformat() }}">{{ snapshot.last_success|meeting_date }} at {{ snapshot.last_success|meeting_time }}</time>
-      {% else %}No successful refresh yet.{% endif %}</p>
-    <a href="{{ '/past' if past else '/' }}">Refresh schedule</a>
-  </div>
   {% if snapshot.stale %}
   <aside class="notice" role="status">
     {% if snapshot.meetings is not none %}<strong>Showing the last successful schedule.</strong>
@@ -37,48 +49,32 @@
     {% endif %}
   </aside>
   {% endif %}
-  {% macro card(meeting, featured=false) %}
-  <article class="meeting {{ 'featured' if featured else '' }} {{ 'canceled' if meeting.canceled else '' }}">
-    <div class="card-top">
-      <p class="eyebrow">{{ 'Next gathering' if featured else ('Special event' if meeting.special_event else 'Meeting') }}</p>
-      {% if meeting.canceled %}<span class="badge">{{ "No meeting" if meeting.special_event else "Canceled" }}</span>{% elif featured %}<span class="badge">See you soon</span>{% endif %}
-    </div>
-    <h{{ '2' if featured else '3' }}>{{ meeting.topic or 'Small group gathering' }}</h{{ '2' if featured else '3' }}>
-    <p class="date"><time datetime="{{ meeting.starts_at.isoformat() }}">{{ meeting.starts_at|meeting_date }}</time></p>
-    <p class="when">{{ meeting.starts_at|meeting_time }} <span aria-hidden="true">·</span> {{ meeting.location or 'Location to be confirmed' }}</p>
-    {% if not meeting.canceled %}
-    <dl class="assignments">
-    {% for field, label in labels.items() %}
-      {% set value = meeting|attr(field) %}
-      {% if value or (field in required and not meeting.special_event) %}
-      <div><dt>{{ label }}</dt><dd>{% if value %}{{ value }}{% else %}<span class="missing">Needs assignment</span>{% endif %}</dd></div>
-      {% endif %}
-    {% endfor %}
-    </dl>
-    {% else %}<p class="cancel-note">This gathering will not take place.</p>
-    <dl class="assignments">
-    {% for field, label in labels.items() %}{% set value = meeting|attr(field) %}
-    {% if value %}<div><dt>{{ label }} (previously planned)</dt><dd>{{ value }}</dd></div>{% endif %}
-    {% endfor %}
-    </dl>
-    {% endif %}
-    {% if meeting.date_conflict %}<p class="notes"><strong>Please confirm this date</strong>More than one entry is listed for this date. Confirm plans with a group leader.</p>{% endif %}
-    {% if meeting.notes %}<p class="notes"><strong>Good to know</strong>{{ meeting.notes }}</p>{% endif %}
-  </article>
-  {% endmacro %}
+  {% if featured_meeting %}{{ card(featured_meeting, true) }}{% endif %}
+  {% if sample %}<p class="demo">Fictional demo schedule · Example names, places, and assignments.</p>{% endif %}
+  <nav aria-label="Meeting views">
+    <a href="/" {% if not past %}aria-current="page"{% endif %}>Upcoming</a>
+    <a href="/past" {% if past %}aria-current="page"{% endif %}>Past meetings</a>
+  </nav>
   {% if snapshot.meetings is not none %}
-    {% if next_meeting %}{{ card(next_meeting, true) }}{% endif %}
-    <section aria-labelledby="list-heading">
-      <div class="section-heading"><h2 id="list-heading">{{ 'Past meetings' if past else 'Upcoming meetings' }}</h2>
-      <span>{{ meetings|length }} {{ 'meeting' if meetings|length == 1 else 'meetings' }}</span></div>
-      {% if meetings %}<div class="meeting-grid">
-        {% for meeting in meetings %}{{ card(meeting) }}{% endfor %}
-      </div>{% else %}<div class="empty"><h3>{{ 'No past meetings yet.' if past else 'More time together is on the way.' }}</h3>
-        <p>{{ 'Previous gatherings will appear here.' if past else 'No upcoming meetings are on the schedule. Check back soon.' }}</p></div>{% endif %}
-      {% if not past and meetings and not next_meeting %}<p class="notice">All upcoming meetings are canceled. A new gathering has not been scheduled yet.</p>{% endif %}
-    </section>
+  <section aria-labelledby="list-heading">
+    <div class="section-heading"><h2 id="list-heading">{{ 'Past meetings' if past else 'Coming up' }}</h2>
+    <span>{{ remaining_meetings|length }} {{ 'meeting' if remaining_meetings|length == 1 else 'meetings' }}</span></div>
+    {% if remaining_meetings %}<div class="meeting-grid">
+      {% for meeting in remaining_meetings %}{{ card(meeting) }}{% endfor %}
+    </div>{% elif not featured_meeting %}<div class="empty"><h3>{{ 'No past meetings yet.' if past else 'More time together is on the way.' }}</h3>
+      <p>{{ 'Previous gatherings will appear here.' if past else 'No upcoming meetings are on the schedule. Check back soon.' }}</p></div>
+    {% else %}<p class="subtle">More gatherings will appear here when scheduled.</p>{% endif %}
+    {% if not past and meetings and not next_meeting %}<p class="notice">All upcoming meetings are canceled. A new gathering has not been scheduled yet.</p>{% endif %}
+  </section>
   {% endif %}
-  <footer>All times are America/Chicago (Central Time).<br>Leaders update the schedule in Google Sheets. Refreshes are checked at most once per minute by default.</footer>
+  <div class="refresh">
+    <p>{% if snapshot.last_success %}Last successful refresh:
+      <time datetime="{{ snapshot.last_success.isoformat() }}">{{ snapshot.last_success|meeting_date }} at {{ snapshot.last_success|meeting_time }}</time>
+      {% else %}No successful refresh yet.{% endif %}</p>
+    <a href="{{ '/past' if past else '/' }}">Refresh schedule</a>
+  </div>
+  <p id="attendance-feedback" class="sr-only" role="status" aria-live="polite"></p>
+  <footer>All times are America/Chicago (Central Time).<br>{{ 'Fictional CSV schedule.' if sample else 'Schedule from Google Sheets.' }} Attendance is saved separately.</footer>
 </main>
 </body>
 </html>
