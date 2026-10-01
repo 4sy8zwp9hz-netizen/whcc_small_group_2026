@@ -18,7 +18,7 @@ No paid services or public app deployment are authorized.
 - Process-local 60-second cache, safe stale fallback, last-successful timestamp,
   useful no-data error, and atomic validation before replacing cached data.
 - Git exclusions, .env.example, Windows/Wi-Fi instructions, future Render command.
-- 26 automated tests passed on Python 3.12.14. Python compilation passed.
+- 27 automated tests passed on Python 3.12.14. Python compilation passed.
 - Browser inspection at 375x812 and 1440x1000. Upcoming and past pages checked;
   no horizontal overflow (document widths 360 and 1425, allowing scrollbars).
   Corrected a text-encoding issue found during the first phone inspection.
@@ -44,6 +44,7 @@ The user signed in, created this empty repository, and explicitly authorized kee
 it PUBLIC, superseding the original private-repository request.
 The local directory remains whcc-small-group-schedule, outside existing work repos.
 Publication uses the authenticated GitHub connector; the local checkout tracks main.
+Published on main; remote contents matched the reviewed local Git tree.
 Git Credential Manager initially had no usable credential. Public cloning needs no
 authentication; future pushes from home require authenticating the personal account.
 No website has been deployed. Public source code is not permission to publish real data.

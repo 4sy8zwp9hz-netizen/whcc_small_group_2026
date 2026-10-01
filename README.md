@@ -84,7 +84,7 @@ dated September-November 2026; advance those dates if demonstrating the app late
 DATA_SOURCE=google
 GOOGLE_APPLICATION_CREDENTIALS=C:/Users/YOUR_NAME/private/whcc-service-account.json
 GOOGLE_SHEET_ID=YOUR_SPREADSHEET_ID
-GOOGLE_SHEET_RANGE='Schedule'!A1:J500
+GOOGLE_SHEET_RANGE="'Schedule'!A1:J500"
 CACHE_SECONDS=60
 ```
 The ID is the /d/ segment of the spreadsheet URL; the range includes the header row.

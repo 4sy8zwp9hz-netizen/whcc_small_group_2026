@@ -240,3 +240,10 @@ def test_actual_sample_csv():
     assert len(meetings) == 7
     assert meetings[0].starts_at.day == 18
     assert sum(m.canceled for m in meetings) == 2
+
+def test_example_env_preserves_quoted_sheet_range():
+    from dotenv import dotenv_values
+    from schedule import ROOT
+    values = dotenv_values(ROOT / ".env.example")
+    assert values["GOOGLE_SHEET_RANGE"] == "'Schedule'!A1:J500"
+    assert values["FIELD_MAPPING_JSON"] == "{}"
