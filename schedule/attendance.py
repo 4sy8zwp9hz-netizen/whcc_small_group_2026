@@ -55,7 +55,16 @@ class AttendanceStore:
                 );
             """)
 
+    def identity(self, visitor):
+        """Recognize a sheet-restored household without exposing its cookie secret."""
+        restored = "import:" + hashlib.sha256(visitor.encode()).hexdigest()
+        with self.lock:
+            row = self.connection.execute("SELECT id FROM households WHERE id IN (?,?) ORDER BY id=? DESC LIMIT 1",
+                                          (visitor, restored, visitor)).fetchone()
+        return row[0] if row else visitor
+
     def household(self, visitor):
+        visitor = self.identity(visitor)
         with self.lock:
             row = self.connection.execute(
                 "SELECT name, members FROM households WHERE id = ?", (visitor,)
@@ -64,6 +73,7 @@ class AttendanceStore:
 
     def save(self, visitor, meeting_id, action, name, people, selected, updated_at):
         with self.lock, self.connection:
+            visitor = self.identity(visitor)
             household = self.household(visitor)
             if household is None:
                 if action not in {"all", "none"}:
@@ -105,6 +115,7 @@ class AttendanceStore:
                 """, (meeting_id, visitor, json.dumps(attending), updated_at))
 
     def summaries(self, meeting_ids, visitor):
+        visitor = self.identity(visitor)
         result = {key: {"own": None, "going": [], "not_going": 0, "people": 0}
                   for key in meeting_ids}
         if not result:
@@ -149,6 +160,8 @@ class Attendance:
         app.add_url_rule("/household/forget", "forget_household", self.forget, methods=["POST"])
 
     def key(self, meeting):
+        if meeting.record_id:
+            return meeting.record_id
         # Date is stable across topic/assignment/time edits. Ambiguous dates cannot RSVP.
         value = self.namespace + "\0" + meeting.starts_at.date().isoformat()
         return hashlib.sha256(value.encode()).hexdigest()[:32]
@@ -168,7 +181,9 @@ class Attendance:
         visitor = self.visitor()
         household = self.store.household(visitor)
         keys = [self.key(meeting) for meeting in meetings]
+        backend = self.app.extensions.get("backend")
         return {
+            "sync_pending": backend.status()["pending"] if backend else False,
             "household": household, "csrf": session["csrf"],
             "attendance": self.store.summaries(keys, visitor),
             "attendance_key": self.key,
@@ -198,16 +213,26 @@ class Attendance:
         if action not in {"all", "none", "custom", "clear"}:
             return self.error("Choose a valid attendance response.", 400)
         try:
-            self.store.save(
-                self.visitor(), meeting_id, action, request.form.get("household", ""),
-                request.form.get("people", ""), request.form.getlist("attending"),
-                self.now().isoformat(),
-            )
+            with self.store.lock:
+                backend = self.app.extensions.get("backend")
+                if backend:
+                    # An admin may have edited after this request read the cache.
+                    current = next((m for m in self.cache.parser(backend.rows())
+                                    if self.key(m) == meeting_id), None)
+                    if current is None or not self.allowed(current, snapshot):
+                        return self.error("This meeting changed. Reload the schedule before responding.", 409)
+                self.store.save(
+                    self.visitor(), meeting_id, action, request.form.get("household", ""),
+                    request.form.get("people", ""), request.form.getlist("attending"),
+                    self.now().isoformat(),
+                )
         except ValueError as exc:
             return self.error(str(exc), 400)
         except sqlite3.Error:
             self.app.logger.warning("Attendance storage unavailable")
             return self.error("Attendance could not be saved. Please try again.", 503)
+        backend = self.app.extensions.get("backend")
+        synced = backend.publish(force=True) if backend else True
         if request.accept_mimetypes.best != "application/json":
             return redirect(url_for("upcoming", _anchor="meeting-" + meeting_id), code=303)
         context = self.context(snapshot.meetings, snapshot)
@@ -216,7 +241,8 @@ class Attendance:
             for meeting in snapshot.meetings
             if meeting.starts_at >= self.now() and not meeting.canceled
         }
-        return jsonify(panels=panels, message="Response cleared." if action == "clear" else "Attendance saved.")
+        return jsonify(panels=panels, message=("Response cleared." if action == "clear" else "Attendance saved.")
+                       + ("" if synced else " Saved locally; Google sync is pending."))
 
     def forget(self):
         if not self.csrf_valid():

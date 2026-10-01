@@ -23,7 +23,7 @@
   <p class="date"><time datetime="{{ meeting.starts_at.isoformat() }}">{{ meeting.starts_at|meeting_date }}</time></p>
   <p class="when">{{ meeting.starts_at|meeting_time }} · {{ meeting.location or 'Location to be confirmed' }}</p>
   {% if meeting.canceled %}<p class="cancel-note">This gathering will not take place.</p>{% endif %}
-  {% if meeting.date_conflict %}<p class="notes"><strong>Please confirm this date</strong>More than one entry is listed for this date. Confirm plans with a group leader.</p>{% endif %}
+  {% if meeting.date_conflict %}<p class="notes"><strong>Please confirm this date</strong>This meeting has conflicting calendar information. Confirm plans with a group leader.</p>{% endif %}
   {% if not meeting.canceled %}{% include "_attendance.html" %}{% endif %}
   <details class="meeting-details">
     <summary>Assignments{% if meeting.notes %} & notes{% endif %}</summary>
@@ -67,6 +67,7 @@
     {% if not past and meetings and not next_meeting %}<p class="notice">All upcoming meetings are canceled. A new gathering has not been scheduled yet.</p>{% endif %}
   </section>
   {% endif %}
+  {% if backend_status and backend_status.pending %}<p class="notice" role="status">Recent changes are saved locally. Google backend sync is pending.</p>{% endif %}
   <div class="refresh">
     <p>{% if snapshot.last_success %}Last successful refresh:
       <time datetime="{{ snapshot.last_success.isoformat() }}">{{ snapshot.last_success|meeting_date }} at {{ snapshot.last_success|meeting_time }}</time>
@@ -74,7 +75,8 @@
     <a href="{{ '/past' if past else '/' }}">Refresh schedule</a>
   </div>
   <p id="attendance-feedback" class="sr-only" role="status" aria-live="polite"></p>
-  <footer>All times are America/Chicago (Central Time).<br>{{ 'Fictional CSV schedule.' if sample else 'Schedule from Google Sheets.' }} Attendance is saved separately.</footer>
+  <footer>All times are America/Chicago (Central Time).<br>{{ 'Fictional CSV schedule.' if sample else 'Schedule from Google Sheets.' }} Attendance is saved separately.
+  {% if admin_enabled %}<br><a href="{{ url_for('admin_index') }}">Leader admin</a>{% endif %}</footer>
 </main>
 </body>
 </html>

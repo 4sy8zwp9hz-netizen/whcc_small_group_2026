@@ -18,7 +18,7 @@ No paid services or public app deployment are authorized.
 - Process-local 60-second cache, safe stale fallback, last-successful timestamp,
   useful no-data error, and atomic validation before replacing cached data.
 - Git exclusions, .env.example, Windows/Wi-Fi instructions, future Render command.
-- 74 automated tests passed on Python 3.12.14. Python compilation passed.
+- 92 automated tests passed on Python 3.12.14. Python compilation passed.
 - Added an optional school-year calendar reader with two-row assignments, header
   mapping, merged event titles, off weeks, optional notes, and footer exclusion.
 - Added configurable leader-confirmed off-date overrides and visible warnings
@@ -57,6 +57,33 @@ No paid services or public app deployment are authorized.
 - Production still needs website access decisions, durable storage, HTTPS cookie
   settings, and a stable signing secret. No public app deployment was performed.
 
+## Admin and Google backend update
+- Owner requested an admin editor and a new backend tab while keeping the original
+  calendar editable. Implemented field-by-field three-way merging with explicit
+  conflict resolution, stale-form rejection, and removed-date review.
+- Created and verified the real App Backend tab using the existing service account.
+  Original calendar content was not edited. Private settings stay in .env.google.
+- Added leader login, 30-minute sessions, CSRF protection, password hashing, and
+  process-local login throttling. Shared-password setup is the prototype assumption.
+- Local initial admin access instructions are in ignored private/ADMIN_ACCESS.txt.
+- Admin edits and member attendance persist locally, then publish with retry status.
+  The sheet stores normalized schedule fields, counts, and restorable app state.
+  Browser identity secrets, admin credentials, and Google credentials are excluded.
+- An empty database restores from the backend. Restored households use one-way IDs;
+  browser cookies and the original signing secret are still needed to recognize them.
+- Tests cover auth/expiry/throttling, field merges, both conflict resolutions, stale
+  forms, source failures, removals, stable identity after app date edits, failed writes,
+  lost acknowledgments, foreign changes, restoration, and scoped literal Sheets writes.
+- Browser validation with fictional data verified admin login, schedule editing,
+  conflict detection/resolution and member-facing results. Phone (360-pixel content)
+  and desktop (1265-pixel content) had no horizontal overflow. The populated Google
+  backend was also visually inspected; its technical ID/state columns are hidden.
+- App Backend is machine-managed. Direct edits or competing writers stop publication.
+  Only one running app instance is supported. Google has no conditional-update
+  primitive, so the read/compare/write check is not a distributed lock.
+- App edits update the effective backend copy, not the original calendar. New entries
+  can be added in the original calendar; the admin editor changes existing meetings.
+
 ## Assumptions and tradeoffs
 - Default required assignments: discussion leader, host, food, childcare.
 - Topic, location, notes, and status are optional; blank location is unconfirmed.
@@ -64,7 +91,8 @@ No paid services or public app deployment are authorized.
 - This week is featured above navigation, including off weeks or already-started
   gatherings. Otherwise the next gathering is featured; it is not duplicated.
 - Sample dates are fixed in September-November 2026.
-- Refreshes happen on page requests; cache does not survive process restarts.
+- Refreshes happen on page requests. The raw cache is process-local; the effective
+  schedule, app edits, and pending sync survive in private SQLite.
 - Entire refresh fails if any populated row is malformed, preserving last-good data.
 - In table mode, Google formatted values must match configured Python formats.
   Calendar mode uses explicit school-year and confirmed start-time configuration,
@@ -75,8 +103,10 @@ No paid services or public app deployment are authorized.
   after the owner corrects the source sheet.
 - The owner expanded scope to household attendance: one remembered household,
   everyone initially selected, individual opt-outs, and All going / Not going.
-- SQLite stores attendance separately; the Google Sheet remains read-only.
-- No user accounts, reminders, payments, or prayer requests.
+- SQLite stores durable attendance and pending writes. The original calendar is
+  read-only to the app; the new App Backend tab receives schedule and attendance.
+- Shared-password admin sign-in is now authorized. No member accounts, reminders,
+  payments, or prayer requests.
 - Cookies identify a browser, not a verified person. Clearing cookies or switching
   devices can create duplicate households. Forgetting preserves old responses.
 - Roster editing, household recovery, and leader correction tools remain future work.

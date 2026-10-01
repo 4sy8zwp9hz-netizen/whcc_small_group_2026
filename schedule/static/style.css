@@ -98,3 +98,23 @@ footer { font-size: .75rem; color: var(--muted); line-height: 1.8; border-top: 1
   .when { line-height: 1.6; }
   .refresh { flex-direction: column; align-items: flex-start; gap: 0; }
 }
+
+
+/* Leader editing stays usable without a frontend build or JavaScript. */
+.admin-page { padding-bottom: 40px; }
+.admin-login { max-width: 540px; margin: auto; }
+.admin-form { display: grid; gap: 20px; }
+.admin-form label { display: grid; gap: 6px; font-size: .9rem; }
+.admin-form input, .admin-form select, .admin-form textarea {
+  width: 100%; min-width: 0; min-height: 44px; border: 1px solid #91a599;
+  background: white; color: var(--ink); border-radius: 8px; padding: 10px; font: inherit;
+}
+.admin-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.admin-fields .wide { grid-column: 1 / -1; }
+.admin-page nav { flex-wrap: wrap; align-items: center; }
+.admin-page nav form { margin: 0; }
+.sync-status { margin: 20px 0; }
+.edit-link { display: inline-block; padding: 10px 0; min-height: 44px; }
+.conflict { border-top: 1px solid var(--line); padding: 16px 0; }
+.conflict p { margin: 6px 0; white-space: pre-wrap; }
+@media (max-width: 640px) { .admin-fields { grid-template-columns: 1fr; } }

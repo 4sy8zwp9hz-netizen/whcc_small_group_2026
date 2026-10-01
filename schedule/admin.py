@@ -1,0 +1,159 @@
+"""Password-protected admin editing with CSRF and optimistic revisions."""
+import hashlib
+import secrets
+import threading
+import time
+from collections import deque
+
+import click
+from flask import abort, redirect, render_template, request, session, url_for
+from werkzeug.security import check_password_hash, generate_password_hash
+
+from .backend import EDIT_FIELDS, digest
+from .data import DataError
+
+
+def install_admin(app, root, backend, attendance):
+    password_path = root / app.config["ADMIN_PASSWORD_FILE"]
+    attempts = deque()
+    attempt_lock = threading.Lock()
+
+    def password_hash():
+        configured = app.config.get("ADMIN_PASSWORD_HASH")
+        if configured:
+            return configured
+        return password_path.read_text(encoding="utf-8").strip() if password_path.exists() else ""
+
+    def csrf():
+        attendance.visitor()
+        return session["csrf"]
+
+    def signed_in():
+        configured = password_hash()
+        return bool(configured and session.get("admin_until", 0) > time.time()
+                    and session.get("admin_credential") == hashlib.sha256(configured.encode()).hexdigest())
+
+    def page(template, **context):
+        return render_template(template, csrf=csrf(), logged_in=signed_in(), **context)
+
+    @app.route("/admin/login", methods=["GET", "POST"])
+    def admin_login():
+        configured = password_hash()
+        error = ""
+        code = 200
+        if request.method == "POST":
+            if not attendance.csrf_valid():
+                abort(400)
+            with attempt_lock:
+                cutoff = time.monotonic() - 300
+                while attempts and attempts[0] < cutoff:
+                    attempts.popleft()
+                if len(attempts) >= 10:
+                    error, code = "Too many attempts. Try again in five minutes.", 429
+                else:
+                    attempts.append(time.monotonic())
+                    supplied = request.form.get("password", "")
+                    if configured and len(supplied) <= 512 and check_password_hash(configured, supplied):
+                        session["admin_until"] = time.time() + 1800
+                        session["admin_credential"] = hashlib.sha256(configured.encode()).hexdigest()
+                        session["csrf"] = secrets.token_urlsafe(32)
+                        return redirect(url_for("admin_index"), code=303)
+                    error, code = "The admin password was not accepted.", 401
+        return page("admin_login.html", configured=bool(configured), error=error), code
+
+    @app.post("/admin/logout")
+    def admin_logout():
+        if not attendance.csrf_valid():
+            abort(400)
+        session.pop("admin_until", None)
+        session.pop("admin_credential", None)
+        session["csrf"] = secrets.token_urlsafe(32)
+        return redirect(url_for("upcoming"), code=303)
+
+    @app.get("/admin")
+    def admin_index():
+        if not signed_in():
+            return redirect(url_for("admin_login"))
+        snapshot = backend.cache.get()
+        return page("admin_index.html", records=backend.records(), sync=backend.status(), stale=snapshot.stale)
+
+    @app.route("/admin/meetings/<key>", methods=["GET", "POST"])
+    def admin_edit(key):
+        if not signed_in():
+            return redirect(url_for("admin_login"))
+        if request.method == "POST" and not attendance.csrf_valid():
+            abort(400)
+        if request.method == "POST":
+            backend.invalidate()
+        snapshot = backend.cache.get()
+        record = next((r for r in backend.records() if r["id"] == key), None)
+        if record is None:
+            abort(404)
+        error, code = "", 200
+        values = record["values"].copy()
+        if request.method == "POST":
+            values = {f: request.form.get(f, "").strip() for f in EDIT_FIELDS if f != "special_event"}
+            values["special_event"] = request.form.get("special_event") == "true"
+            try:
+                if snapshot.stale:
+                    raise DataError("The original calendar could not refresh. Try again before editing.")
+                backend.edit(key, request.form.get("revision", ""), values,
+                             {field: request.form.get("resolve_" + field) for field in record["conflicts"]})
+                return redirect(url_for("admin_index"), code=303)
+            except DataError as exc:
+                error, code = str(exc), 409
+            except ValueError:
+                error, code = "Check the date and time, then try again.", 400
+        return page("admin_edit.html", record=record, values=values, fields=EDIT_FIELDS,
+                    error=error, stale=snapshot.stale,
+                    version_conflict=(request.method == "POST" and
+                                      request.form.get("revision") != str(record["revision"]))), code
+
+    @app.post("/admin/sync")
+    def admin_sync():
+        if not signed_in():
+            return redirect(url_for("admin_login"))
+        if not attendance.csrf_valid():
+            abort(400)
+        backend.invalidate()
+        backend.cache.get()
+        backend.publish(force=True)
+        return redirect(url_for("admin_index"), code=303)
+
+    @app.cli.command("set-admin-password")
+    @click.password_option(confirmation_prompt=True)
+    def set_admin_password(password):
+        """Set a shared admin password locally without storing plaintext."""
+        if app.config.get("ADMIN_PASSWORD_HASH"):
+            raise click.ClickException("ADMIN_PASSWORD_HASH is configured. Change that server secret instead.")
+        if len(password) < 12 or len(password) > 512:
+            raise click.ClickException("Use a password between 12 and 512 characters.")
+        password_path.parent.mkdir(parents=True, exist_ok=True)
+        password_path.write_text(generate_password_hash(password), encoding="utf-8")
+        click.echo("Admin password updated. Existing admin sessions are invalidated.")
+
+    @app.cli.command("init-sheet-backend")
+    def init_sheet_backend():
+        """Create the configured new tab from the current normalized schedule."""
+        if not backend.publisher:
+            raise click.ClickException("Set BACKEND_SHEET_ENABLED=true with DATA_SOURCE=google.")
+        snapshot = backend.cache.get()
+        if snapshot.stale or snapshot.meetings is None:
+            raise click.ClickException("The source calendar could not be read; no tab was created.")
+        with backend.store.lock:
+            payload = backend.export()
+            try:
+                sheet_id = backend.publisher.create(payload)
+                verified = backend.publisher.read()
+                if digest(verified) != digest(payload):
+                    raise DataError("The created tab could not be verified. Retry sync before using it.")
+                with backend.store.connection:
+                    backend.set_meta("published_hash", digest(payload))
+                    backend.set_meta("last_sync", attendance.now().isoformat())
+                backend.sync_error = ""
+            except Exception as exc:
+                raise click.ClickException(
+                    str(exc) if isinstance(exc, DataError) else
+                    "Google could not create the backend tab. Check service-account Editor access and retry."
+                ) from None
+        click.echo("Backend tab created and verified. Sheet gid: " + str(sheet_id))

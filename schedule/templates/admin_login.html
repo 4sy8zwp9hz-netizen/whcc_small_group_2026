@@ -1,0 +1,11 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<section class="meeting admin-login"><h2>Leader sign-in</h2>
+{% if configured %}
+<p>Use the shared admin password. Your admin session lasts 30 minutes.</p>
+{% if error %}<p class="notice" role="alert">{{ error }}</p>{% endif %}
+<form method="post" class="admin-form"><input type="hidden" name="csrf" value="{{ csrf }}">
+<label>Admin password<input type="password" name="password" autocomplete="current-password" required maxlength="512"></label>
+<button class="rsvp-choice">Sign in</button></form>
+{% else %}<p>Admin access has not been configured on this server yet.</p><p>Run the <code>flask --app app set-admin-password</code> setup command from the project environment, then reload this page.</p>{% endif %}
+</section>{% endblock %}

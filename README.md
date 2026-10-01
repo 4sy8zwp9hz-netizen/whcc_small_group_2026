@@ -1,6 +1,6 @@
 # WHCC small group schedule
 
-A mobile-friendly Flask schedule with quick household attendance for a West Houston Christian Church
+A mobile-friendly Flask schedule with household attendance and a leader admin area for a West Houston Christian Church
 small group. Leaders continue editing Google Sheets. The app starts immediately
 with fictional CSV data and needs no Google credentials in demo mode.
 
@@ -44,8 +44,9 @@ The app loads only the project's .env; existing environment variables take prece
   timestamp, with a stale warning. Failed retries are also throttled.
 - First-load failure returns a useful HTTP 503 page. A valid header-only sheet is
   a successful empty schedule.
-- Cache is in memory per process. Restarting loses the last-good snapshot.
-  There is intentionally no disk cache of private data.
+- The raw calendar cache is in memory per process. With SCHEDULE_EDITING=true,
+  the effective schedule and pending changes persist in the private SQLite database.
+  On restart, a failed source refresh shows persisted data with a stale warning.
 
 
 ## Quick household attendance
@@ -61,8 +62,8 @@ response** removes that gathering's answer while keeping the remembered househol
 Canceled, past, ambiguous, or stale schedules reject attendance changes.
 
 A signed, HttpOnly, SameSite=Lax cookie remembers a random household identifier
-for up to a year. Names and responses stay in the server's SQLite database, not
-the cookie or Google Sheet. The default database is private/attendance.sqlite3;
+for up to a year. Names and responses stay out of the cookie. They are stored in
+the private SQLite database and, when enabled, mirrored into the App Backend tab. The default database is private/attendance.sqlite3;
 a locally generated signing secret persists in private/session.key. Both are
 ignored by Git. Back up these files privately together to preserve local attendance.
 Cloning source code does not transfer attendance or remembered households.
@@ -117,7 +118,8 @@ dated September-November 2026; advance those dates if demonstrating the app late
 3. Create/download its JSON key to a secure location outside this repository.
    Do not paste the key into chat, commit it, or put it in static/.
 4. Share the target spreadsheet directly with the service account's client_email
-   as **Viewer**. Keep the spreadsheet unpublished and otherwise private.
+   as **Viewer** for schedule reading alone, or **Editor** for the optional app
+   backend. Keep the spreadsheet unpublished and otherwise private.
 5. Configure your untracked .env:
 ```dotenv
 DATA_SOURCE=google
@@ -130,10 +132,11 @@ The ID is the /d/ segment of the spreadsheet URL; the range includes the header 
 Adjust the range to include all meetings and only intended columns. Extend row 500
 when needed. Restart after configuration changes.
 
-The adapter performs a values GET using only
+The original-calendar adapter performs a values GET using only
 https://www.googleapis.com/auth/spreadsheets.readonly and a 15-second read timeout.
 Credentials and tokens stay server-side. No Drive write access, published CSV URL,
-or browser Google authentication is used.
+or browser Google authentication is used. The optional backend writer uses the
+spreadsheets scope and is restricted in application code to its configured tab.
 
 Troubleshooting: check the enabled API, Viewer sharing, key path, spreadsheet ID,
 tab/range, unique headers, mapping, and displayed date/time formats. Raw exception
@@ -165,9 +168,10 @@ See PROJECT_STATUS.md for the latest observed results and visual checks.
 ## Future Render deployment (not deployed)
 Before deployment, decide who may access the website and how that access is enforced.
 **A private Google Sheet does not make the website private.**
-This prototype has no website authentication: anyone with network access can read it.
+The admin area requires a password, but the member-facing pages have no website
+authentication: anyone with network access can read them and submit attendance.
 Decide which addresses, names, notes, and assignments are appropriate to display.
-An access gateway is one possible future choice; no account system is implemented.
+An access gateway is one possible future choice; no member account system is implemented.
 
 For a future Linux Render web service:
 - Build command: `pip install -r requirements.txt`
@@ -180,7 +184,10 @@ For a future Linux Render web service:
 - Mount the Google service-account key as a secret file; point
   GOOGLE_APPLICATION_CREDENTIALS to its absolute server path.
 - One worker maintains one shared process cache; multiple workers/instances have
-  independent caches. Plan a shared cache only if scaling requires it.
+  independent caches. This prototype supports one running server/worker with
+  multiple threads. Do not run competing copies against the same backend tab.
+- Back up SQLite and signing secrets. Use stronger admin access and external rate
+  limiting before internet-facing deployment; local login throttling is process-local.
 - Flask's development server is for local testing only. No service was purchased,
   created, or deployed for this proof of concept.
 
@@ -188,7 +195,101 @@ References: [Render Flask guide](https://render.com/docs/deploy-flask),
 [Flask Gunicorn guidance](https://flask.palletsprojects.com/en/stable/deploying/gunicorn/),
 [Google Sheets scopes](https://developers.google.com/workspace/sheets/api/scopes),
 [Render persistent disks](https://render.com/docs/disks),
-[Flask cookie security](https://flask.palletsprojects.com/en/stable/web-security/).
+[Flask cookie security](https://flask.palletsprojects.com/en/stable/web-security/),
+[Google batch update behavior](https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/batchUpdate).
+
+
+## Admin editing and the App Backend tab
+Open /admin and sign in with the shared leader password. Admin access expires after
+30 minutes; changing the password invalidates existing admin sessions. Forms use
+CSRF checks and meeting revisions, so a stale edit cannot silently replace a newer
+calendar or admin change. Login attempts are limited to ten per five minutes per
+process. Member attendance still needs no account.
+
+Set or change the password locally (hidden interactive entry, minimum 12 characters):
+```powershell
+.\.venv\Scripts\python.exe -m flask --app app set-admin-password
+```
+Add --env-file .env.google before --app when using the private Google configuration.
+Only the hash is stored in private/admin-password.hash. Alternatively configure
+ADMIN_PASSWORD_HASH as a server secret. When that environment override is present,
+change it through your secret configuration instead of the local command.
+A generated initial password on the original workstation is in the ignored
+private/ADMIN_ACCESS.txt note; neither password nor hash comes through Git.
+
+SCHEDULE_EDITING=true (the default) enables a local effective schedule and admin UI.
+Demo edits persist in the private database and do not modify data/sample.csv.
+To keep the earlier read-only schedule mode, set SCHEDULE_EDITING=false.
+
+To connect the new backend tab, add these private settings:
+```dotenv
+SCHEDULE_EDITING=true
+BACKEND_SHEET_ENABLED=true
+BACKEND_SHEET_TITLE=App Backend
+```
+Use the existing Google ID, credentials, original calendar range, and mapping.
+The service account needs Editor access to this spreadsheet. The writer uses
+Google's spreadsheets scope; Google does not provide a scope restricted to one
+tab. Application code only writes the configured new backend tab and rejects
+using the original calendar's name.
+
+Create and verify the tab once:
+```powershell
+.\.venv\Scripts\python.exe -m flask --env-file .env.google --app app init-sheet-backend
+.\.venv\Scripts\python.exe -m flask --env-file .env.google --app app run
+```
+Creation refuses to replace an existing tab. A fresh clone with an empty local
+database restores existing app records automatically from the backend; do not
+re-run initialization against a tab that already exists.
+
+The backend has one row per meeting: normalized date/time, assignments, notes,
+status, attendance counts, and conflict flags. Its hidden final column holds the
+structured state needed for restoration, including household members and responses.
+Hiding a column is only a layout choice, not access control. No passwords, service
+account keys, session secrets, or raw browser identity tokens are sent to Sheets.
+
+### Continuing to edit the original calendar
+- The original calendar remains intact and editable by leaders. Source reads happen
+  on demand, cached for about 60 seconds. An admin can refresh immediately.
+- A change made only in the calendar flows into the app/backend. A change made only
+  in the app remains as an override. Changes to different fields merge.
+- If both sides change the same field differently, the admin page shows the previous
+  value, current calendar value, and app value. Choose which to use before saving.
+  Attendance is paused for meetings with unresolved conflicts.
+- App edits do not rewrite the original calendar. Use the app or original calendar
+  for human edits; the backend tab is managed by the app.
+- Original dates identify imported meetings because the calendar has no stable ID
+  column. Moving a date in the original calendar appears as a removed old entry and
+  a new entry. An admin must keep/cancel the old entry; attendance is not silently
+  transferred. Moving a date through the app preserves that meeting's identity.
+- Removing a calendar row never silently deletes app data. An admin chooses to
+  retain or cancel it. Duplicate source dates pause refresh until corrected.
+- New meetings can be added to the original calendar and will import automatically.
+  The admin UI edits existing meetings and can cancel them; it has no delete button.
+
+### Writes, outages, and recovery
+Admin changes and member responses commit to local SQLite first, then attempt
+Google publication. A Google outage shows a pending-sync message; changes survive
+a restart and retry on later page requests, no more often than about once a minute,
+or immediately from the admin retry button. There is no unattended background job.
+Do not delete local data while writes are pending.
+
+Only one app server should write this backend. The writer checks the last published
+snapshot before updating and verifies the result afterward. Unexpected backend edits
+or another server's changes stop publication instead of overwriting them. Google
+Sheets does not support an atomic conditional update, so this is not a multi-writer
+database. Do not hand-edit, sort, or add formulas to the managed tab.
+
+For an external-edit conflict, preserve the local database and a private copy of the
+backend, stop competing writers, and reconcile them deliberately. There is no
+automatic destructive reset or last-writer-wins switch. Keep a matching database and
+session signing secret when moving the running server. A new database can restore
+schedule/attendance from Sheets; existing browser identity still requires its cookie
+and the original signing secret. A new machine does not inherit browser cookies.
+
+If the sheet is shared with anyone who has the link, that also exposes the new tab,
+including attendance details. Admin authentication protects editing through the app;
+it does not change spreadsheet sharing or protect the public member pages.
 
 ## Continue with Codex
 Read AGENTS.md, README.md, and PROJECT_STATUS.md first. Run the validation commands,

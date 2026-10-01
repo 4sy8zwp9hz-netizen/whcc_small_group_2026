@@ -1,6 +1,7 @@
 {% set key = attendance_key(meeting) %}
 {% set summary = attendance[key] %}
 <section class="rsvp-panel" data-meeting="{{ key }}" aria-label="Household attendance">
+  {% if sync_pending and summary.own is not none %}<p class="rsvp-hint" role="status">Saved on this server; Google sync is pending.</p>{% endif %}
   {% if can_respond(meeting) %}
   <form class="rsvp-form" action="{{ url_for('save_attendance', meeting_id=key) }}" method="post">
     <input type="hidden" name="csrf" value="{{ csrf }}">

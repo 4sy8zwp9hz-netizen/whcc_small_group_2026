@@ -18,6 +18,11 @@ def create_app(test_config=None, source=None, now=None):
     load_dotenv(ROOT / ".env", override=False)
     app = Flask(__name__)
     app.config.from_mapping(
+        SCHEDULE_EDITING=os.getenv("SCHEDULE_EDITING", "true").lower() == "true",
+        BACKEND_SHEET_ENABLED=os.getenv("BACKEND_SHEET_ENABLED", "false").lower() == "true",
+        BACKEND_SHEET_TITLE=os.getenv("BACKEND_SHEET_TITLE", "App Backend"),
+        ADMIN_PASSWORD_HASH=os.getenv("ADMIN_PASSWORD_HASH", ""),
+        ADMIN_PASSWORD_FILE=os.getenv("ADMIN_PASSWORD_FILE", "private/admin-password.hash"),
         SECRET_KEY=os.getenv("SECRET_KEY") or None,
         RSVP_DATABASE=os.getenv("RSVP_DATABASE", "private/attendance.sqlite3"),
         RSVP_SECRET_FILE=os.getenv("RSVP_SECRET_FILE", "private/session.key"),
@@ -54,6 +59,8 @@ def create_app(test_config=None, source=None, now=None):
         app.config.update(test_config)
     if app.testing and (not test_config or "RSVP_DATABASE" not in test_config):
         app.config["RSVP_DATABASE"] = ":memory:"
+    if app.testing and (not test_config or "SCHEDULE_EDITING" not in test_config):
+        app.config["SCHEDULE_EDITING"] = False
     mapping = dict(zip(FIELDS, FIELDS))
     overrides = json.loads(app.config["FIELD_MAPPING_JSON"])
     if not isinstance(overrides, dict) or any(
@@ -113,6 +120,22 @@ def create_app(test_config=None, source=None, now=None):
     attendance_service = Attendance(app, ROOT, cache, now)
     app.extensions["attendance"] = attendance_service
 
+    backend = None
+    if app.config["SCHEDULE_EDITING"]:
+        from .backend import Backend
+        from .admin import install_admin
+        publisher = None
+        if app.config["BACKEND_SHEET_ENABLED"]:
+            if app.config["DATA_SOURCE"] != "google":
+                raise ValueError("The Google backend requires DATA_SOURCE=google.")
+            from .sheet_backend import SheetBackend
+            publisher = SheetBackend(app.config["GOOGLE_SHEET_ID"],
+                                     app.config["GOOGLE_APPLICATION_CREDENTIALS"],
+                                     app.config["BACKEND_SHEET_TITLE"], app.config["GOOGLE_SHEET_RANGE"])
+        backend = Backend(app, cache, attendance_service, publisher)
+        app.extensions["backend"] = backend
+        install_admin(app, ROOT, backend, attendance_service)
+
     @app.after_request
     def response_headers(response):
         response.headers["Cache-Control"] = "no-store"
@@ -154,6 +177,7 @@ def create_app(test_config=None, source=None, now=None):
             remaining_meetings=remaining, **attendance_context,
             next_meeting=next_meeting, past=past, labels=LABELS,
             required=required, sample=app.config["DATA_SOURCE"] == "csv",
+            backend_status=backend.status() if backend else None, admin_enabled=bool(backend),
         ), 503 if snapshot.meetings is None else 200
 
     @app.get("/")

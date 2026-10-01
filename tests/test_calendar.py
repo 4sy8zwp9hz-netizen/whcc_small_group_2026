@@ -140,7 +140,7 @@ def test_calendar_app_integration_and_special_event_blanks():
     html = response.get_data(as_text=True)
     assert "Autumn social" in html
     assert "6:00 PM CDT" in html
-    assert "More than one entry" in html
+    assert "conflicting calendar information" in html
     featured = html.split('<article class="meeting featured')[1].split("</article>")[0]
     assert "Needs assignment" not in featured
     assert "Casey" not in html  # Unmapped Worship assignment.

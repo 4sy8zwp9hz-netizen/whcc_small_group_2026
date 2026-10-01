@@ -113,6 +113,7 @@ class Meeting:
     canceled: bool
     special_event: bool = False
     date_conflict: bool = False
+    record_id: str = ""
 
 
 def parse_meetings(rows, mapping, date_format, time_format) -> tuple[Meeting, ...]:
@@ -136,6 +137,7 @@ def parse_meetings(rows, mapping, date_format, time_format) -> tuple[Meeting, ..
             raise DataError("Meeting time is ambiguous because of daylight saving time.")
         meetings.append(Meeting(
             starts_at=starts_at,
+            record_id=str(row.get("_record_id", "")),
             canceled=status in {"canceled", "cancelled"},
             special_event=row.get("_special_event") is True,
             date_conflict=row.get("_date_conflict") is True,
