@@ -57,21 +57,24 @@ class HeaderRows(list):
 
 
 class CsvSource:
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, row_adapter=table_rows):
         self.path = path
+        self.row_adapter = row_adapter
 
     def read(self):
         with self.path.open(encoding="utf-8-sig", newline="") as stream:
-            return table_rows(list(csv.reader(stream)))
+            return self.row_adapter(list(csv.reader(stream)))
 
 
 class GoogleSheetsSource:
     """Only a Sheets values GET with the spreadsheets.readonly scope."""
 
-    def __init__(self, spreadsheet_id: str, sheet_range: str, credentials_path: str):
+    def __init__(self, spreadsheet_id: str, sheet_range: str, credentials_path: str,
+                 row_adapter=table_rows):
         self.spreadsheet_id = spreadsheet_id
         self.sheet_range = sheet_range
         self.credentials_path = credentials_path
+        self.row_adapter = row_adapter
 
     def read(self):
         # Lazy import/authentication: CSV mode never needs Google credentials.
@@ -94,7 +97,7 @@ class GoogleSheetsSource:
                 url, params={"valueRenderOption": "FORMATTED_VALUE"}, timeout=15
             )
             response.raise_for_status()
-            return table_rows(response.json().get("values", []))
+            return self.row_adapter(response.json().get("values", []))
 
 
 @dataclass(frozen=True)
@@ -108,6 +111,8 @@ class Meeting:
     childcare: str
     notes: str
     canceled: bool
+    special_event: bool = False
+    date_conflict: bool = False
 
 
 def parse_meetings(rows, mapping, date_format, time_format) -> tuple[Meeting, ...]:
@@ -132,6 +137,8 @@ def parse_meetings(rows, mapping, date_format, time_format) -> tuple[Meeting, ..
         meetings.append(Meeting(
             starts_at=starts_at,
             canceled=status in {"canceled", "cancelled"},
+            special_event=row.get("_special_event") is True,
+            date_conflict=row.get("_date_conflict") is True,
             **{key: values[key] for key in FIELDS if key not in {"date", "time", "status"}},
         ))
     return tuple(sorted(meetings, key=lambda meeting: meeting.starts_at))

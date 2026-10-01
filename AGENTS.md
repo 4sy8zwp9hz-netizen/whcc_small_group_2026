@@ -37,3 +37,12 @@ content for horizontal overflow; keep controls keyboard-accessible.
 Tests cover chronology, next gathering, cancellation, blanks, cache TTL, stale/error
 states, mapping, DST, escaping, and the read-only Google adapter contract.
 Real Google connectivity requires separately supplied credentials and sheet access.
+
+## Calendar layout
+The optional calendar adapter lives in schedule/calendar.py. Keep its rules generic:
+year/time/headers/off-date overrides belong in environment configuration. Use only
+fictional data in tests/fixtures. Never commit the real sheet ID or copied rows.
+The school-year rollover and start time must be explicit. Keep source dates intact;
+only apply leader-confirmed off-date overrides. Do not edit the Google Sheet unless
+asked. Any local .env.google and private/ notes are ignored and do not transfer by
+clone. Live Google API verification still needs the user's server-side credentials.

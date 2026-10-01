@@ -148,3 +148,72 @@ References: [Render Flask guide](https://render.com/docs/deploy-flask),
 Read AGENTS.md, README.md, and PROJECT_STATUS.md first. Run the validation commands,
 then resolve the next recorded task within the agreed scope. Do not deploy publicly
 or introduce real group information until website access has been decided.
+
+## Two-row calendar layout
+The optional calendar reader supports a school-year calendar with month/day dates,
+a topic on a continuation row, paired assignments, and merged event/off-week titles.
+It reads the existing layout without editing the spreadsheet.
+
+Keep real connection settings in an ignored .env.google file. Example with fictional
+settings (replace the year, headers, range, ID, and key path with your own):
+```dotenv
+DATA_SOURCE=google
+SHEET_LAYOUT=calendar
+GOOGLE_APPLICATION_CREDENTIALS=C:/Users/YOUR_NAME/private/whcc-service-account.json
+GOOGLE_SHEET_ID=YOUR_SPREADSHEET_ID
+GOOGLE_SHEET_RANGE="'Calendar'!A1:J200"
+FIELD_MAPPING_JSON={"host":"Host","food":"Dinner","discussion_leader":"Discussion","childcare":"Childcare","notes":"Event notes"}
+CALENDAR_START_YEAR=2030
+CALENDAR_START_MONTH=9
+CALENDAR_START_TIME=18:00
+CALENDAR_DATE_COLUMN=A
+CALENDAR_EVENT_COLUMN=D
+CALENDAR_END_MARKER=Roles
+CALENDAR_TOPIC_LABELS_JSON=["Sermon Series"]
+CALENDAR_CANCELED_DATES=
+```
+
+Start that configuration explicitly:
+```powershell
+.\.venv\Scripts\python.exe -m flask --env-file .env.google --app app run
+```
+
+- Start the source range at column A and include its header row. The date header
+  may be blank and host columns may be hidden; neither prevents reading.
+- Map assignment headers exactly, ignoring leading/trailing whitespace. Four
+  mapped role headers must each appear once. The notes mapping is optional.
+- Dates such as "September 6" use the configured start year; months before the
+  start month use the following year. This is independent of the current date.
+  Update the year/range deliberately when rolling to a new school year.
+- CALENDAR_START_TIME is required, in 24-hour HH:MM Central Time, and applies to
+  every gathering. It must be confirmed by a leader, not inferred from bare times.
+- A date row starts a meeting. A continuation row with a blank date or an allowed
+  topic label adds assignments to that meeting. Distinct names are joined with " / ".
+  If the topic label changes, update CALENDAR_TOPIC_LABELS_JSON.
+- An event title in the configured event column becomes the topic when there are
+  no mapped assignments or continuation topics. Off/break/canceled event titles
+  are treated as no-meeting weeks. Social events do not show missing role warnings.
+- Stop reading at CALENDAR_END_MARKER so role descriptions and timetables are not
+  mistaken for meetings. Ensure the requested range includes every meeting.
+- Optional mapped notes are included. All unmapped columns are discarded during
+  normalization and never rendered. The reader does not read other tabs.
+- Unexpected date labels or changed required headers fail the whole refresh,
+  preserving the last successful schedule. Color and strikethrough are not status
+  signals; the reader uses cell text only.
+- Duplicate dates are preserved and visibly flagged. For a leader-confirmed off
+  date, set CALENDAR_CANCELED_DATES to comma-separated ISO dates. Each explicit
+  override keeps one off-week entry and suppresses incorrect regular entries on
+  that date. These overrides are local configuration; reconcile them after the
+  source sheet is corrected.
+- A host assignment is not a location/address. Missing locations remain unconfirmed.
+- In calendar mode, normalized dates/times use ISO and HH:MM internally; DATE_FORMAT
+  and TIME_FORMAT apply only to the original table layout.
+
+No real sheet IDs, participant data, connection files, or credentials are included
+in Git. An ignored .env.google or private/ note on one computer will not come through
+a clone; recreate it privately on the next computer. The default fictional CSV
+still works without Google authentication.
+
+A fully fictional calendar fixture lives at tests/fixtures/calendar.csv. Tests
+cover two-row grouping, year rollover, events, off-week overrides, duplicate dates,
+notes, ignored columns, malformed refreshes, and the authenticated adapter contract.
