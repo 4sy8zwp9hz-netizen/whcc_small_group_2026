@@ -118,3 +118,16 @@ footer { font-size: .75rem; color: var(--muted); line-height: 1.8; border-top: 1
 .conflict { border-top: 1px solid var(--line); padding: 16px 0; }
 .conflict p { margin: 6px 0; white-space: pre-wrap; }
 @media (max-width: 640px) { .admin-fields { grid-template-columns: 1fr; } }
+
+/* Native remember-device checkbox: the whole label is a comfortable tap target. */
+.admin-form .remember-device {
+  display: flex; align-items: center; gap: 12px; min-height: 44px; cursor: pointer;
+}
+.admin-form .remember-device input {
+  width: 22px; height: 22px; min-height: 22px; flex: 0 0 22px; margin: 0; padding: 0;
+  accent-color: var(--ink);
+}
+.remember-device input:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+.remember-help { margin: 6px 0 0; font-size: .85rem; color: var(--muted); }
+
+.group-login { width: calc(100% - 32px); margin: 24px auto; }

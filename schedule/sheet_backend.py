@@ -1,8 +1,9 @@
 """Write only the explicitly configured app tab; original calendar stays read-only."""
 import json
 import re
-import uuid
 import copy
+import time
+import hashlib
 from urllib.parse import quote
 
 from .backend import EDIT_FIELDS, encode, validate_values, digest
@@ -18,10 +19,14 @@ class SheetBackend:
     def __init__(self, spreadsheet_id, credentials_path, title, source_range):
         if not title or len(title) > 100 or any(c in title for c in "[]:*?/\\"):
             raise ValueError("Choose a valid backend tab name.")
-        source_title = source_range.split("!")[0].strip("'").replace("''", "'")
+        from .source_identity import source_title as parse_source_title
+        source_title = parse_source_title(source_range)
         if title.casefold() == source_title.casefold():
             raise ValueError("The backend tab must differ from the original calendar.")
         self.spreadsheet_id, self.credentials_path, self.title = spreadsheet_id, credentials_path, title
+        self._properties = None
+        self._properties_until = 0
+        self.receipts = {}
         self.base_url = "https://sheets.googleapis.com/v4/spreadsheets/" + quote(spreadsheet_id, safe="")
 
     def request(self, method, suffix="", **kwargs):
@@ -34,10 +39,31 @@ class SheetBackend:
             return response.json()
 
     def sheets(self):
-        return self.request("GET", params={"fields": "sheets.properties"})["sheets"]
+        return self.get(params={"fields": "sheets.properties"})["sheets"]
 
     def properties(self):
-        return next((s["properties"] for s in self.sheets() if s["properties"]["title"] == self.title), None)
+        if self._properties is not None and time.monotonic() < self._properties_until:
+            return self._properties
+        self._properties = next((s["properties"] for s in self.sheets()
+                                 if s["properties"]["title"] == self.title), None)
+        self._properties_until = time.monotonic() + 300
+        return self._properties
+
+    @staticmethod
+    def retryable(exc):
+        from requests.exceptions import ConnectionError, Timeout
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+        return isinstance(exc, (ConnectionError, Timeout, TimeoutError)) or status in {429, 500, 502, 503, 504}
+
+    def get(self, suffix="", **kwargs):
+        # One bounded retry for a safe GET. Never retry arbitrary validation/4xx errors.
+        for attempt in range(2):
+            try:
+                return self.request("GET", suffix, **kwargs)
+            except Exception as exc:
+                if attempt or not self.retryable(exc):
+                    raise
+                time.sleep(0.2)
 
     @staticmethod
     def table(items):
@@ -70,8 +96,8 @@ class SheetBackend:
                 raise DataError("Invalid backend conflicts.")
             reply_ids = set()
             profiles = item.get("households", [])
-            if not isinstance(profiles, list):
-                raise DataError("Invalid household profiles.")
+            if not isinstance(profiles, list) or len({profile["id"] for profile in profiles}) != len(profiles):
+                raise DataError("Invalid or duplicate household profiles.")
             for reply in [*item["responses"], *[{**profile, "attending": []} for profile in profiles]]:
                 if not re.fullmatch(r"[a-f0-9]{64}", reply["id"]) or (reply in item["responses"] and reply["id"] in reply_ids):
                     raise DataError("Backend household IDs must be unique.")
@@ -89,11 +115,15 @@ class SheetBackend:
                 ) or not set(reply["attending"]).issubset(member_ids):
                     raise DataError("Invalid backend attendance.")
 
+        from .state_patch import entities
+        entities(items)
+
     def read(self):
+        self.receipts = {}
         if not self.properties():
             return None
         target = "'" + self.title.replace("'", "''") + "'!A:Q"
-        table = self.request("GET", "/values/" + quote(target, safe=""),
+        table = self.get("/values/" + quote(target, safe=""),
                              params={"valueRenderOption": "UNFORMATTED_VALUE"}).get("values", [])
         if not table or table[0] != HEADERS:
             raise DataError("The backend tab has unexpected columns. Nothing was overwritten.")
@@ -104,7 +134,7 @@ class SheetBackend:
                 if not any(str(v).strip() for v in row):
                     continue
                 payload = json.loads(row[16])
-                if isinstance(payload, dict) and payload.get("_event") == 1:
+                if isinstance(payload, dict) and payload.get("_event") in {1, 2}:
                     if row != self.event_row(payload):
                         raise DataError("A backend update was edited directly.")
                     events.append(payload)
@@ -140,11 +170,21 @@ class SheetBackend:
                 if payloads[identity] != event:
                     raise DataError("Duplicate update identity has different contents.")
                 continue
-            cls.validate(event["changes"])
+            version = event.get("_event", 1)
+            if version == 1:
+                cls.validate(event["changes"])
+            elif version == 2:
+                from .state_patch import apply
+                candidate = apply(state, event["patch"])
+                cls.validate(candidate)
+            else:
+                raise DataError("Unsupported backend event version.")
             if not isinstance(event["expected"], str) or not re.fullmatch(r"[a-f0-9]{64}", event["expected"]):
                 raise DataError("Invalid backend update version.")
             accepted = event["expected"] == digest(state)
-            if accepted:
+            if accepted and version == 2:
+                state = candidate
+            elif accepted:
                 records = {item["record"]["id"]: item for item in state}
                 records.update({item["record"]["id"]: item for item in event["changes"]})
                 state = sorted(records.values(), key=lambda item: (item["record"]["values"]["date"],
@@ -155,32 +195,50 @@ class SheetBackend:
         return state, receipts
 
     def commit(self, items, base):
-        """Append one optimistic event; never rewrite accepted history."""
+        """Append a small mutation and return verified state; Sheets is not immutable."""
+        from .state_patch import diff
         self.validate(items)
-        old = {item["record"]["id"]: item for item in base}
-        if set(old) - {item["record"]["id"] for item in items}:
-            raise DataError("Deleting backend records is not supported.")
-        changes = [item for item in items if old.get(item["record"]["id"]) != item]
-        event = {"_event": 1, "id": uuid.uuid4().hex, "expected": digest(base), "changes": changes}
+        event = {"_event": 2, "expected": digest(base), "patch": diff(base, items)}
+        # Content-derived identity stays identical for a retry, even after restart.
+        event["id"] = hashlib.sha256(encode(event).encode()).hexdigest()[:32]
         row = self.event_row(event)
         if len(row[16]) > 49000:
-            raise DataError("This update exceeds the Sheets cell limit. Split it into smaller changes.")
+            raise DataError("This update exceeds the supported cell size. Reduce the batch or recover manually with all writers stopped.")
         target = "'" + self.title.replace("'", "''") + "'!A:Q"
-        try:
-            self.request("POST", "/values/" + quote(target, safe="") + ":append",
-                         params={"valueInputOption": "RAW", "insertDataOption": "INSERT_ROWS"},
-                         json={"values": [row]})
-        except Exception:
-            # A timed-out append may still have persisted; inspect its receipt once.
-            pass
-        self.read()
-        if not self.receipts.get(event["id"]):
-            raise DataError("The update was not confirmed or another writer changed the backend. Reload before retrying.")
+        # At most two append attempts, with the exact same event ID and payload.
+        # Unknown acceptance is checked before retrying; replay deduplicates late copies.
+        for attempt in range(2):
+            try:
+                self.request("POST", "/values/" + quote(target, safe="") + ":append",
+                             params={"valueInputOption": "RAW", "insertDataOption": "INSERT_ROWS"},
+                             json={"values": [row]})
+            except Exception as exc:
+                if not self.retryable(exc):
+                    raise
+            try:
+                state = self.read()
+            except Exception as exc:
+                if attempt or not self.retryable(exc):
+                    raise
+                time.sleep(0.2)
+                continue
+            if state is None:
+                raise DataError("The backend tab is missing. Restore it before retrying.")
+            receipt = self.receipts.get(event["id"])
+            if receipt is True:
+                return state
+            if receipt is False:
+                raise DataError("Another writer changed the backend. Reload before retrying.")
+            if attempt:
+                break
+            # Even a successful append may not yet be visible. Retry only this same event.
+            time.sleep(0.2)
+        raise DataError("The update acknowledgment is unknown. Reload before retrying; it may already be saved.")
 
     def cells_request(self, sheet_id, items, old_rows=0):
         rows = self.table(items)
         if any(len(str(value)) > 49000 for row in rows for value in row):
-            raise DataError("Attendance is too large for a sheet cell. Use a database before adding more households.")
+            raise DataError("Attendance is too large for a sheet cell. Initialize smaller batches with all writers stopped.")
         cells = []
         for row in rows:
             values = []
@@ -233,15 +291,5 @@ class SheetBackend:
         return sheet_id
 
     def write(self, items):
-        self.validate(items)
-        properties = self.properties()
-        if properties is None:
-            raise DataError("The backend tab is missing.")
-        needed = len(items) + 1
-        requests = []
-        if needed > properties["gridProperties"]["rowCount"]:
-            requests.append({"appendDimension": {"sheetId": properties["sheetId"], "dimension": "ROWS",
-                                                 "length": needed - properties["gridProperties"]["rowCount"]}})
-        requests.append(self.cells_request(properties["sheetId"], items,
-                                           min(properties["gridProperties"]["rowCount"], max(needed, 1000))))
-        self.request("POST", ":batchUpdate", json={"requests": requests})
+        """Deliberately disabled: full-tab replacement can destroy append history."""
+        raise DataError("Full-tab writes are disabled. Use append mutations; restore backups manually with all writers stopped.")

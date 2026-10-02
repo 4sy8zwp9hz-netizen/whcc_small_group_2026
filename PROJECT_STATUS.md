@@ -3,8 +3,8 @@
 Updated: 2026-10-02
 
 ## Purpose and boundaries
-Original personal project for the owner's WHCC small group, co-led with his wife
-Diana and another member. Practice internet-facing deployment while making the
+Original personal project for a WHCC small group. Practice internet-facing deployment
+while making the
 existing Google Sheets schedule readable on phones. Existing work applications
 were not modified; no company code, configuration, data, or archives were copied.
 No paid services or public app deployment are authorized.
@@ -179,7 +179,8 @@ No SQL/Redis/Firebase or persistent disk, no CI/CD and no unattended sync proces
    ongoing source deploy/actAs permissions; see README's exact commands.
 4. Restrict sheet sharing, share as Editor with runtime email, back up the full App
    Backend and stop all older/full-tab writers. No live migration was done here.
-5. Generate/store secrets, create private cloudrun.env.yaml with actual confirmed
+5. Explicitly select migrate/fresh mode; preserve the effective signing key for
+   existing state. Prepare secrets and private cloudrun.env.yaml with actual confirmed
    source layout/year/time/mappings. Review gcloud upload file list.
 6. Deploy manually only when authorized, then execute the post-deployment checklist.
 
@@ -237,3 +238,127 @@ dozen users. No guaranteed $0: build/image storage, secrets, logs/egress and sha
 free allowances matter. Set $5 alerts-only project budget at 20/50/90/100% and
 forecast 100%, verify notifications and inspect billing after deployment. Alerts
 and instance limits are not hard spending caps. README gives cleanup considerations.
+
+
+## Independent-review targeted fixes (local, 2026-10-02)
+User chose to KEEP Sheets as the authoritative backend and accept accidental history
+changes/manual recovery. No other database or external history checkpoint was added.
+The original review request permitted implementation/local verification only: no live spreadsheet
+changes, cloud resources, deployment, commit or push. The reviewed commit remains
+821f7d8d9af9f89ed3644da0db6bf91a2fdffab6; changes below are uncommitted locally.
+
+### Changes made
+- Canonical A1 source-title spelling and legacy SQLite scope migration preserve
+  existing IDs/pending overrides. Restored source-date matching retains historical
+  meeting IDs and RSVP URLs; ambiguous preexisting dates fail closed.
+- Bounded per-signed-browser failure limits for independent group/admin gates;
+  successful logins do not consume allowance and proxy IP headers are not trusted.
+- Reuse pre-write snapshot and verified commit results; five-minute metadata cache.
+  Warm RSVP: two values GETs instead of eight GETs. GET retries once; append retries
+  at most once with identical content-derived event ID/payload. Delayed duplicates
+  deduplicate; unknown acknowledgment returns an error and may later recover.
+- Version-two granular record/profile/response/clear mutations avoid embedding all
+  household rosters/responses on each small update. Legacy baseline/version-one
+  replay remains supported. No live conversion/rewrite was performed.
+- Migration secret helper explicitly requires --mode migrate or fresh. Migration
+  preserves effective signing-key precedence, refuses missing/conflicting keys and
+  never creates a replacement. Fresh refuses detected old key/local SQLite state.
+  Key continuity does not move a cookie to a different hostname; no automatic
+  cross-device/cross-host household recovery UI exists.
+- Unnecessary co-leader name/family context removed from current documentation.
+  Existing published commits are unchanged because commit/push/history edits were
+  not authorized in this task.
+- Runtime full-tab write method fails before contacting Sheets. New-tab creation
+  remains explicit and refuses to replace an existing backend.
+- README/AGENTS explain draining/revoking old writers, complete hidden-state backups,
+  managed-tab protection, stopped-writer restoration, payload/maintenance limits.
+
+### Verification and deployment readiness
+At the end of that task, 136 tests passed, including real reader/append replay via shared fake Sheets,
+two independent SQLite/backend writers with append barriers (RSVP vs RSVP and admin
+vs RSVP), stale rejection with safe retry, delayed acceptance after HTTP error and
+empty-cache restart, eight-response burst within mocked 60-read quota, 429 retries,
+large non-ASCII rosters/historical meetings, clear preserving profiles/member IDs,
+old RSVP URLs with equivalent A1 spelling, cookie key versus host migration,
+per-browser isolation, and disabled legacy replacement. Final validation: full suite passed, compileall passed for app.py/schedule/tests/tools,
+and git diff --check passed. Working-tree files were reviewed for unrelated/private
+content; no new credential or real sheet identifiers were introduced. No real credentials or API calls used.
+Docker is unavailable here: actual container build/execution, UID 10001 /tmp access,
+Cloud Run ADC and managed HTTPS checks remain outstanding. Prior browser checks
+still apply to the unchanged schedule/admin layouts; new runtime behavior was tested
+server-side. No deployment was attempted or authorized.
+
+### Accepted limitations and operations
+Sheets is editable history, not immutable storage or transactional compare-and-swap.
+Stale predecessor checking protects ordinary intact-log writes. It cannot reliably
+detect deleted/reordered history or restoration of an outdated tab on a cold instance.
+Ordinary restart recovery is supported; altered/deleted history may need manual
+complete-backup recovery. Stop/drain every writer before migration/restoration;
+revoke old identities' write access where practical. Protect the whole managed tab,
+including appended rows and hidden state. Never hand-sort/edit/delete event rows.
+Unknown acknowledgment may persist after the caller saw an error: reload before
+retrying. Signed-browser throttling is basic, bypassable by clearing cookies and
+resets on replacement; limiter storage remains bounded. The full log is reread and
+replayed; inspect growth/latency monthly and plan private-copy maintenance around
+2,000 events or recurring quota/latency problems. No automatic compaction exists.
+Keep stable signing-key versions; new hostnames require deliberate household
+reconciliation rather than a promise of transparent browser migration.
+
+
+## Optional remembered group access (local, 2026-10-02)
+All preceding uncommitted review fixes remain in place. Added an unchecked native
+"Remember this device for 30 days" group-login checkbox, associated label, helper
+text, keyboard focus styling and a 44-pixel label target. Login spacing remains
+usable on phones. No admin checkbox, database, device registry, session records in
+Sheets, or additional login/logout Sheets calls were introduced.
+
+Successful login sets a fixed server-enforced group_until: 24 hours by default,
+30 days only for the explicit checked value. Duplicate/unrecognized values and
+submitted deadlines cannot select longer access. Browsing/RSVP/restart retain the
+original deadline; later unchecked success replaces remembered access with 24 hours.
+Wrong passwords and invalid CSRF do not grant or extend access. Credential-hash
+rotation invalidates remembered group authorization; browser failure limits remain.
+Admin password and 30-minute deadline remain independent. Household-cookie lifetime
+remains 365 days with refresh disabled. Expiry/logout preserve household, roster and
+responses; group logout clears both authorizations and rotates CSRF. Recognition
+requires the same cookie/browser/hostname/key. Cookie clearing loses identity.
+Logout cannot revoke an already-copied signed cookie. Use only on personal devices;
+shared-device users should sign out. No fingerprinting or remote device revocation.
+
+Validation: actual pre-feature baseline 136 passed; final full suite 157 passed.
+21 new cases cover duration selection, exact expiry, no sliding, re-login, failure,
+CSRF, throttling, admin separation, logout, recovery with empty SQLite and mocked
+durable state, password rotation, tampering, secure cookies and public health.
+Login inspected in browser at 375/1440 pixels: no overflow, readable helper text,
+44-pixel label target, label tap and keyboard Tab/Space work. Native form submission
+succeeds with all scripts blocked by a preview-only Content-Security-Policy
+(script-src 'none'); login contains no scripts. No browser-setting disable test
+is claimed. Docker is unavailable:
+container build/execution and real Cloud Run ADC/HTTPS checks remain outstanding.
+Compileall and git diff --check passed. No secrets/settings/helper changes, live
+Google API calls, staging, commit, push, deployment or cloud-resource changes.
+HEAD remains 821f7d8d9af9f89ed3644da0db6bf91a2fdffab6 and index hash unchanged.
+At the end of that task, changes were LOCAL AND UNCOMMITTED. The publication
+authorization below supersedes that restriction; the stopped-writer backup
+procedure still applies before any future migration/deployment.
+
+
+## Combined publication review (2026-10-02)
+The owner authorized review, staging, commit and normal push of the completed
+reliability fixes and optional remembered group login to the existing personal
+repository main branch. No deployment, Google Cloud changes, live spreadsheet
+access or real secret generation/rotation is authorized. This revision includes
+those combined changes; preceding local-only reports describe earlier task states.
+
+The current checkout branch/origin and authenticated personal GitHub account were
+verified. Fetched origin/main matched the starting HEAD with no divergence. All
+publication candidates and ignore rules were reviewed: original project source,
+documentation and fictional fixtures only; private runtime files remain ignored.
+No CI/CD workflow was added and no deployment triggers were configured.
+Final suite: 157 tests passed; app.py/schedule/tests/tools compileall and working
+and staged diff whitespace checks passed. Prior 375/1440-pixel login, keyboard,
+label-tap and script-blocked native form checks remain applicable.
+Docker build/execution, non-root /tmp access, real Cloud Run ADC and managed HTTPS
+verification remain outstanding. Sheets remains authoritative with editable history
+and manual stopped-writer backup/recovery limitations. The secret helper's --help
+was inspected only; neither mode was run against real settings.

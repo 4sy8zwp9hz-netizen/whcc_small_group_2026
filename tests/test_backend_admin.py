@@ -116,7 +116,7 @@ def test_bad_password_expiry_rotation_and_throttle():
     csrf = login(client)
     app.config["ADMIN_PASSWORD_HASH"] = generate_password_hash("another-fictional-password", method="pbkdf2:sha256:1000")
     assert client.get("/admin").status_code == 302
-    for _ in range(8):
+    for _ in range(10):
         assert client.post("/admin/login", data={"csrf": csrf, "password": "wrong"}).status_code == 401
     assert client.post("/admin/login", data={"csrf": csrf, "password": "wrong"}).status_code == 429
 

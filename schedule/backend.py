@@ -83,6 +83,21 @@ class Backend:
                     scope TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL,
                     PRIMARY KEY(scope,key));
             """)
+        # Move the old quoted-name scope without changing IDs or queued SQLite state.
+        if app.config["DATA_SOURCE"] == "google" and not self.records():
+            from .source_identity import legacy_namespaces
+            aliases = {hashlib.sha256(n.encode()).hexdigest() for n in legacy_namespaces(
+                app.config["GOOGLE_SHEET_ID"], app.config["GOOGLE_SHEET_RANGE"])} - {self.scope}
+            found = [scope for scope in aliases if self.store.connection.execute(
+                "SELECT 1 FROM app_schedule WHERE scope=? LIMIT 1", (scope,)).fetchone()]
+            if len(found) > 1:
+                raise DataError("Multiple old source scopes exist. Preserve the cache and reconcile them before migration.")
+            if found:
+                with self.store.lock, self.store.connection:
+                    self.store.connection.execute("UPDATE app_schedule SET scope=? WHERE scope=?", (self.scope, found[0]))
+                    for row in self.store.connection.execute("SELECT key,value FROM app_metadata WHERE scope=?", (found[0],)).fetchall():
+                        self.set_meta(row["key"], row["value"])
+                    self.store.connection.execute("DELETE FROM app_metadata WHERE scope=?", (found[0],))
         cache.source = self
         cache.parser = lambda rows: parse_meetings(rows, MAPPING, "%Y-%m-%d", "%H:%M")
         if self.records():
@@ -111,14 +126,23 @@ class Backend:
             (self.scope, record["id"], encode(record)))
 
     def read(self):
+        base = None
         if self.strict:
             with self.store.lock, self.store.connection:
-                self.refresh_remote()
+                base = self.refresh_remote()
                 self.cache.snapshot = Snapshot(self.cache.parser(self.rows()), self.attendance.now(), True)
+        elif self.publisher and not self.records():
+            with self.store.lock, self.store.connection:
+                self.restore_if_available()
+        old_records = self.records()
         meetings = self.parser(self.source.read())
         incoming = {}
         for meeting in meetings:
-            key = self.attendance.key(meeting)
+            matches = [record for record in old_records
+                       if record["source_date"] == meeting.starts_at.date().isoformat()]
+            if len(matches) > 1:
+                raise DataError("Existing backend dates are ambiguous. Reconcile duplicate records before syncing.")
+            key = matches[0]["id"] if matches else self.attendance.key(meeting)
             if key in incoming or meeting.date_conflict:
                 raise DataError("Resolve duplicate dates in the original calendar before syncing.")
             incoming[key] = meeting_values(meeting)
@@ -136,7 +160,7 @@ class Backend:
             for key in old.keys() - incoming.keys():
                 if old[key]["source_date"]:
                     self.put(merge_record(old[key], None))
-        if not self.publish(force=self.strict) and self.strict:
+        if not self.publish(force=self.strict, base=base) and self.strict:
             with self.store.lock, self.store.connection:
                 self.refresh_remote()
             raise DataError("The schedule refresh could not be confirmed in Sheets.")
@@ -178,7 +202,7 @@ class Backend:
             record["values"], record["conflicts"] = values, {}
             record["revision"] += 1
             self.put(record)
-            if self.strict and not self.publish(force=True):
+            if self.strict and not self.publish(force=True, base=backup):
                 self.restore(backup, replace=True)
                 raise DataError("The edit was not confirmed in Sheets. Reload before retrying.")
         self.invalidate()
@@ -252,7 +276,7 @@ class Backend:
         self.set_meta("published_hash", digest(remote))
         self.set_meta("last_sync", self.attendance.now().isoformat())
 
-    def publish(self, force=False):
+    def publish(self, force=False, base=None):
         if not self.publisher:
             return True
         if not force and time.monotonic() < self.retry_at:
@@ -261,7 +285,7 @@ class Backend:
             try:
                 desired = self.export()
                 expected = self.meta("published_hash")
-                remote = self.publisher.read()
+                remote = base if base is not None else self.publisher.read()
                 if remote is None:
                     raise DataError("Create the App Backend tab using the setup command.")
                 actual = digest(remote)
@@ -270,11 +294,20 @@ class Backend:
                     if not expected or actual != expected:
                         raise DataError("The backend tab changed outside this app. No data was overwritten. Reconcile it before retrying.")
                     if hasattr(self.publisher, "commit"):
-                        self.publisher.commit(desired, remote)
+                        confirmed = self.publisher.commit(desired, remote)
+                        if confirmed is None:
+                            raise DataError("Google did not confirm the update. Reload before retrying.")
+                        self.publisher.validate(confirmed)
+                        if digest(confirmed) != wanted:
+                            # Our event was accepted, but a newer accepted event followed it.
+                            # Import that verified state rather than claiming it was lost.
+                            with self.store.connection:
+                                self.restore(confirmed, replace=True)
+                            wanted = digest(confirmed)
                     else:
                         self.publisher.write(desired)
-                    if digest(self.publisher.read()) != wanted:
-                        raise DataError("Google did not confirm the backend contents. Retry sync.")
+                        if digest(self.publisher.read()) != wanted:
+                            raise DataError("Google did not confirm the backend contents. Retry sync.")
                 with self.store.connection:
                     self.set_meta("published_hash", wanted)
                     self.set_meta("last_sync", self.attendance.now().isoformat())

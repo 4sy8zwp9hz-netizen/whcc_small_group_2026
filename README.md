@@ -171,8 +171,12 @@ See PROJECT_STATUS.md for the latest observed results and visual checks.
 Open /admin and sign in with the shared leader password. Admin access expires after
 30 minutes; changing the password invalidates existing admin sessions. Forms use
 CSRF checks and meeting revisions, so a stale edit cannot silently replace a newer
-calendar or admin change. Login attempts are limited to ten per five minutes per
-process. Member attendance still needs no account.
+calendar or admin change. Failed logins are limited to ten per five minutes per signed browser identity;
+successful logins do not consume this allowance. Group/admin limits are independent.
+Limiter storage is bounded to 1,024 browser entries per gate, in process memory.
+No IP is taken from arbitrary forwarded headers: Cloud Run proxy IPs are not useful
+client identities here. Clearing cookies or replacing an instance resets the limit,
+so this is basic abuse reduction, not comprehensive internet attack protection. Member attendance still needs no account.
 
 Set or change the password locally (hidden interactive entry, minimum 12 characters):
 ```powershell
@@ -244,10 +248,10 @@ return an error and roll back provisional cache changes. A lost network acknowle
 can mean an update reached Sheets despite the error: reload before retrying.
 
 The original calendar stays read-only. The App Backend starts with its existing
-meeting rows, then receives immutable append-only update rows. Each update includes
+meeting rows, then receives append-only update rows during ordinary app operation. Each update includes
 the digest of its expected predecessor. Replay in sheet order accepts only a matching
 predecessor; overlapping stale writers are rejected, and duplicate update IDs are
-idempotent. Accepted history is never rewritten by normal sync. Original visible
+idempotent. The runtime full-tab replacement path is disabled. Original visible
 meeting rows are the initial snapshot; later logical values/counts are shown by the
 app, not refreshed into those initial cells. Do not hand-edit, sort, delete, or add
 formulas to this tab. Back up the full tab, including the hidden state column.
@@ -255,8 +259,16 @@ formulas to this tab. Back up the full tab, including the hidden state column.
 Stop older app versions before using this version: their full-tab writer can destroy
 update history. Keep max instances 1 and one Gunicorn worker. The log protects against
 brief replacement overlap, but Sheets remains a small proof-of-concept store, not a
-general transactional database. Updates exceeding 49,000 characters are rejected;
-the log grows with use and is reread on refresh. Compaction is a future maintenance
+general transactional database. Sheets does not provide immutable history or
+transactional compare-and-swap. Reordering, deleting, or restoring old sheet rows
+can silently change replayed state; this accepted low-risk limitation requires
+manual recovery from a complete backup. No external checkpoint is used.
+Updates exceeding 49,000 characters are rejected;
+the log grows with use and is reread on refresh. New version-two updates contain
+only changed schedule records, changed household profiles, and individual response
+updates/clear operations. Profiles are not copied into every RSVP event. The reader
+still accepts legacy meeting baselines and version-one events; no live migration
+or baseline replacement is needed. Old versions cannot read version-two events. Compaction is a future maintenance
 feature and must only happen offline with all writers stopped and a verified backup.
 
 Fresh instances restore schedule overrides, profiles/members and responses from the
@@ -399,12 +411,28 @@ Local development can still use an external `GOOGLE_APPLICATION_CREDENTIALS` fil
 Do not set that variable or upload a service-account JSON on Cloud Run.
 
 ### 3. Create three Secret Manager secrets
-Generate local values without displaying them; the script prompts twice for each
-password, writes password hashes and a random signing key to ignored files, and
-refuses to overwrite existing files. Passwords should be distinct and kept privately.
+Select **migrate** to preserve an existing installation, or **fresh** only when
+there is no existing state or signing key. Before migration, stop/drain the old runtime and
+identify its effective signing key: process SECRET_KEY first, selected private env
+file next, repository .env next, otherwise its configured RSVP_SECRET_FILE (default
+private/session.key). Preserve the old private database, key, exact source config
+and complete backend backup; reconcile pending development writes before switching.
+The script never generates a signing key in migration mode, refuses missing/conflicting
+keys, and refuses to overwrite existing deployment-secret files. It prompts twice
+for each group/admin password and writes only hashes plus the preserved key.
+Passwords should be distinct and kept privately.
+
+Keeping the key lets existing signed cookies work **on the same hostname**. Browsers
+do not send localhost/home-PC cookies to a new Cloud Run hostname. Changing the key
+also invalidates old cookies. Historical households/responses remain in Sheets, but
+this proof of concept has no cross-host household recovery UI. Before moving users
+to a different hostname, plan leader-assisted reconciliation and avoid treating a
+new household identity as automatic recovery of the old one. Do not weaken cookie
+scope or expose browser identity tokens to transfer them.
 
 ```powershell
-.\.venv\Scripts\python.exe tools/create_deployment_secrets.py
+.\.venv\Scripts\python.exe tools/create_deployment_secrets.py --mode migrate --env-file .env.google
+# If the original runtime uses a nondefault key file, add --key-file PRIVATE_SIGNING_KEY_PATH.
 gcloud secrets create whcc-secret-key --replication-policy=automatic --data-file=private/deployment-secrets/secret-key
 gcloud secrets create whcc-group-password-hash --replication-policy=automatic --data-file=private/deployment-secrets/group-password-hash
 gcloud secrets create whcc-admin-password-hash --replication-policy=automatic --data-file=private/deployment-secrets/admin-password-hash
@@ -412,6 +440,14 @@ foreach ($SecretName in @("whcc-secret-key", "whcc-group-password-hash", "whcc-a
     gcloud secrets add-iam-policy-binding $SecretName --member="serviceAccount:$RuntimeEmail" --role="roles/secretmanager.secretAccessor"
 }
 ```
+For a genuinely new installation with no existing state or key, use
+`python tools/create_deployment_secrets.py --mode fresh` instead. Fresh mode refuses
+a detected signing key or local SQLite state, preventing accidental migration key
+replacement. Do not select fresh simply because the deployment computer is new;
+bring the existing signing key privately from the original runtime. If a signing
+secret already exists in Secret Manager, reuse that pinned version rather than
+create a new secret or rotate its value during migration.
+
 Grant Secret Accessor on these individual secrets only. Pin versions (initially `1`)
 in the deployment command. Rotation uses `gcloud secrets versions add SECRET_NAME
 --data-file=PRIVATE_FILE`, then deploy the chosen new version. Rotating a password
@@ -466,7 +502,13 @@ prompt to create its Artifact Registry repository. Approve only when you are rea
 for the first deployment and potential charges.
 
 One worker, four Gunicorn threads and concurrency 4 keep slow API calls manageable;
-SQLite/backend writes share a process lock. Service-level `--min=0 --max=1` applies
+SQLite/backend writes share a process lock. Normal warm RSVP mutations use two
+backend values GETs (fresh pre-write state plus append verification), with tab
+metadata cached for five minutes. GETs retry once after 0.2 seconds for timeout,
+429 or retryable 5xx errors. Appends have at most two attempts with identical
+content-derived event IDs/payloads, inspecting receipts before retry; delayed copies
+are deduplicated on replay. Permanent permission/validation errors are not retried.
+Unknown acknowledgments return an error, never an unverified success. Service-level `--min=0 --max=1` applies
 across revisions. Cloud Run can briefly exceed its max during replacements, so the
 append log also rejects stale independent writers. No persistent disk is required.
 Cloud Run terminates TLS; narrow ProxyFix trusts only the final protocol header,
@@ -577,3 +619,99 @@ Invoke-RestMethod http://localhost:8080/health
 ```
 The schedule is intentionally unavailable with fictional Google configuration.
 Do not pass real credentials for this build/health check.
+
+## Operational migration and backup procedure
+
+1. **Stop and drain all legacy writers.** Close local development servers, stop old
+   hosted revisions, block incoming mutations and wait for outstanding requests.
+   Remove legacy service-account Editor access where practical; the new runtime
+   should use its dedicated identity. Stopping a browser is not stopping a server.
+2. **Preserve and reconcile.** Back up the old SQLite cache, effective signing key,
+   private source config, and the complete App Backend tab, including hidden column
+   Q and every accepted/rejected event row. Resolve any locally pending writes with
+   the authoritative sheet deliberately before changing runtimes. Never initialize
+   over an existing backend. Test the procedure on a private copy first.
+3. **Protect the managed tab.** In Sheets use Data > Protect sheets and ranges to
+   protect the whole App Backend sheet (including future appended rows), allowing
+   only the runtime identity and designated recovery owners to edit. Avoid manual
+   sorting, filtering that reorders rows, cell editing, deletion, and formulas.
+   Protection reduces accidents; owners can still alter history, and it is not an
+   independent integrity checkpoint. Keep ordinary leader edits in the source tab.
+4. **Start the new version carefully.** Preserve the signing key, verify configured
+   layout/year/time and source tab, then restore into an empty cache on a private
+   test copy. Verify old meeting IDs/RSVP links, profiles/member IDs, historical
+   answers, overrides and clear behavior. Equivalent quoted/unquoted A1 spellings
+   retain restored IDs. If duplicate existing source dates/scopes are found, stop
+   and reconcile them; do not select an arbitrary record. Enable controlled use
+   only after verification and the outstanding container/Cloud Run checks.
+5. **Restore only with all writers stopped and drained.** Preserve the damaged tab
+   separately, restore a verified complete backup (never just visible columns),
+   clear/recreate the ephemeral production cache, and test restoration with the
+   same signing key before reopening. A restored older backup intentionally loses
+   updates newer than that backup; communicate that and re-enter them deliberately.
+
+Ordinary scale-to-zero/restart recovery is supported. Altered, reordered, or deleted
+Sheets history can require manual recovery and is not reliably detected by an empty
+instance. This is the accepted architecture: no external database or checkpoint.
+Back up before migration/restoration and periodically during use, especially before
+administrative changes. Choose frequency according to the amount of re-entry you
+would tolerate (weekly is a reasonable starting point for this small group).
+
+### Practical capacity and maintenance
+Tests cover twenty households with twenty members each, maximum-length non-ASCII
+member names, multiple meetings, historical responses, clear, and schedule edits.
+An individual RSVP toggle/clear does not grow with the other households' rosters;
+a schedule edit does not carry RSVP data. A single maximum-size profile still fits
+one mutation cell. Large multi-record source imports can exceed the 49,000-character
+aggregate event limit and fail clearly; no partial success is acknowledged.
+This is a small-group proof of concept, not an unlimited-capacity service. Start with
+no more than a few dozen households; inspect the managed row count and refresh time
+monthly. At 2,000 event rows, consistently slow refreshes, or repeated quota errors,
+pause growth and plan maintenance on a backed-up private copy. No automated log
+compaction is implemented; do not delete rows to shorten the log while writers run.
+Manual backup/recovery is preferable to adding infrastructure for this scope.
+
+### Current verification
+The combined reliability fixes and remembered group login are reviewed for
+publication on main under explicit owner authorization. No live sheet/cloud changes
+or deployment were performed. Tests cover independent admin/RSVP
+writers with synchronized append barriers, stale rejection/retry, quota-sized bursts,
+429 handling, delayed unknown acceptance, empty-cache cookie recovery, large rosters,
+source identity, per-browser throttling, and explicit signing-key migration.
+Docker is not installed/on PATH here; actual image execution as UID 10001, runtime
+ADC and real managed-HTTPS verification remain outstanding before deployment.
+
+
+## Remembering group access
+The group login's native **Remember this device for 30 days** checkbox is unchecked
+by default. A successful login grants a fixed 24 hours, or a fixed 30 days only
+when explicitly checked. The server enforces the absolute deadline on every
+protected request. Browsing, RSVPs, and restarts do not extend it. Existing cookies
+are not upgraded; a later unchecked login replaces the deadline with 24 hours.
+Failed passwords, invalid CSRF, and arbitrary submitted durations cannot extend it.
+
+Household identity is separate: its existing signed cookie persists for up to
+365 days, linking the saved roster and responses after ordinary group expiry or
+logout. Admin access still requires its own password and expires after 30 minutes;
+remembering or re-entering the group password does not extend or revive it.
+Group logout requires a CSRF-protected POST, clears group and admin authorization,
+rotates CSRF, and keeps household identity and stored responses. **Forget this
+household** remains the separate action that clears this browser's identity.
+
+Use remembered access only on a personal browser profile; sign out on shared
+devices. "This device" means that profile retaining its cookie, without hardware
+fingerprinting. Recognition requires the same browser, hostname, and signing key.
+Clearing cookies loses recognition; cookies do not transfer to a different hostname.
+Changing the group password hash invalidates group authorization, including remembered
+sessions. These are stateless signed cookies: logout clears the receiving browser's
+authorization but cannot independently revoke an already-copied valid cookie.
+
+Validation before publication: baseline 136 tests, final
+157 tests; controlled-clock authorization/recovery tests use fictional data and
+mocked durable storage. Login inspected at 375 and 1440 pixels without horizontal
+overflow; label tapping, keyboard Tab/Space, and native submission verified. The
+login loads no scripts and native login also succeeded with all scripts blocked by
+a preview-only Content-Security-Policy (script-src 'none'). Docker is unavailable; actual image execution,
+Cloud Run ADC and managed HTTPS verification remain outstanding. No live Sheets or
+cloud changes or deployment were performed. The owner subsequently authorized
+staging, committing and pushing the reviewed project changes to main.

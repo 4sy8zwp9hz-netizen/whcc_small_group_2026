@@ -1,8 +1,8 @@
 # WHCC small group schedule
 
 ## Scope
-Personal proof of concept for West Houston Christian Church, led by the owner,
-his wife Diana, and another member. This is original code in a separate repository.
+Personal proof of concept for a West Houston Christian Church small group.
+This is original code in a separate repository.
 Never copy company code, configurations, credentials, private data, or chat archives.
 The owner authorized admin schedule editing, a new App Backend tab, and attendance
 updates in that tab. The original calendar adapter remains read-only. Merge its
@@ -28,7 +28,9 @@ group information online. A private sheet does not make the website private.
   literal cell values, never interpret submitted text as spreadsheet formulas.
 - Use one Gunicorn worker and Cloud Run service min 0 / max 1. Replacement overlap
   is possible: append optimistic updates, replay only matching predecessor digests,
-  never rewrite accepted history. Stop older full-tab writers before migration.
+  use append mutations in normal operation. Sheets history is editable and is not
+  immutable or transactional compare-and-swap. Stop/drain all legacy writers, revoke
+  their write access where practical, and back up the complete tab before migration.
 - Preserve revisions, source baselines and stable meeting IDs. Queue local writes
   only in development; production restores Sheets state and rolls back failed writes.
 - Admin edits require authentication, expiry, CSRF, validation, and a current revision.
@@ -81,3 +83,21 @@ storage with the same cookie, strict failed writes, stale overlapping writers,
 credential mocks and group/CSRF gates. Never run pre-log app versions on a backend
 that contains update events. Container/source-upload ignore files are allowlists;
 review them when adding runtime files. Install requirements-dev.txt for validation.
+
+## Accepted Sheets limitations and review fixes
+Keep Sheets authoritative; no other database or external checkpoint. Ordinary
+restart recovery is supported. Changed/reordered/deleted sheet history may change
+replayed state without detection and require manual backup recovery; never imply
+otherwise. Protect the whole managed tab, including appended rows and hidden state.
+Restore only with every writer stopped. Full-tab runtime replacement is disabled;
+creation may initialize a NEW tab only. Read legacy baselines/version-one events,
+write version-two granular record/profile/RSVP mutations. Reuse verified commit
+results and bound retries with stable event IDs. Preserve restored meeting IDs by
+source date and canonicalize equivalent A1 tab spellings; do not invent new IDs for
+existing meetings. Keep per-browser login limits bounded; do not trust proxy IPs or
+arbitrary forwarded headers. Migration secret preparation must preserve the existing
+effective signing key and explicitly distinguish host-origin cookie limitations.
+The original review-fix request authorized local changes/testing only. The owner
+subsequently authorized staging, commit and normal push of the combined fixes and
+remembered group login to the existing personal main branch. No live Sheets access,
+cloud resources, deployment or real secret generation/rotation is authorized.

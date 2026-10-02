@@ -70,7 +70,7 @@ def test_group_throttle_and_password_rotation():
     csrf = group_login(client)
     app.config["GROUP_ACCESS_PASSWORD_HASH"] = generate_password_hash("changed-fictional-password", method="pbkdf2:sha256:1000")
     assert client.get("/").location.endswith("/group/login")
-    for _ in range(9):
+    for _ in range(10):
         assert client.post("/group/login", data={"csrf": csrf, "password": "wrong"}).status_code == 401
     assert client.post("/group/login", data={"csrf": csrf, "password": GROUP}).status_code == 429
 

@@ -152,7 +152,8 @@ class Attendance:
         database = app.config["RSVP_DATABASE"]
         self.store = AttendanceStore(database if database == ":memory:" else root / database)
         if app.config["DATA_SOURCE"] == "google":
-            source = app.config["GOOGLE_SHEET_ID"] + "\0" + app.config["GOOGLE_SHEET_RANGE"].split("!")[0]
+            from .source_identity import source_title
+            source = app.config["GOOGLE_SHEET_ID"] + "\0" + source_title(app.config["GOOGLE_SHEET_RANGE"])
         else:
             source = str((root / app.config["CSV_PATH"]).resolve())
         self.namespace = app.config["DATA_SOURCE"] + "\0" + source
@@ -230,7 +231,7 @@ class Attendance:
                     request.form.get("people", ""), request.form.getlist("attending"),
                     self.now().isoformat(),
                 )
-                if backend and backend.strict and not backend.publish(force=True):
+                if backend and backend.strict and not backend.publish(force=True, base=backup):
                     with self.store.connection:
                         backend.restore(backup, replace=True)
                     return self.error("Your response was not confirmed in Sheets. Reload before retrying.", 503)

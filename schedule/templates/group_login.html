@@ -1,1 +1,30 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Group access</title><link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head><body><main class="admin-page admin-login"><h1>WHCC small group</h1><p>Enter the shared group password to see the schedule.</p>{% if error %}<p role="alert">{{ error }}</p>{% endif %}<form method="post" class="admin-form"><input type="hidden" name="csrf" value="{{ csrf }}"><label>Group password <input type="password" name="password" required maxlength="512" autocomplete="current-password"></label><button type="submit">Open schedule</button></form></main></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Group access</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<main class="admin-page admin-login group-login">
+  <h1>WHCC small group</h1>
+  <p>Enter the shared group password to see the schedule.</p>
+  {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+  <form method="post" class="admin-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Group password
+      <input type="password" name="password" required maxlength="512" autocomplete="current-password">
+    </label>
+    <div>
+      <label for="remember-device" class="remember-device">
+        <input type="checkbox" id="remember-device" name="remember_device" value="30_days" aria-describedby="remember-help">
+        <span>Remember this device for 30 days</span>
+      </label>
+      <p id="remember-help" class="remember-help">Use only on your personal device. Without this option, access lasts up to 24 hours. Sign out when finished on a shared device.</p>
+    </div>
+    <button type="submit">Open schedule</button>
+  </form>
+</main>
+</body>
+</html>

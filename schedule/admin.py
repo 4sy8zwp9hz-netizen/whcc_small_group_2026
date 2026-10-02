@@ -1,9 +1,7 @@
 """Password-protected admin editing with CSRF and optimistic revisions."""
 import hashlib
 import secrets
-import threading
 import time
-from collections import deque
 
 import click
 from flask import abort, redirect, render_template, request, session, url_for
@@ -15,8 +13,8 @@ from .data import DataError
 
 def install_admin(app, root, backend, attendance):
     password_path = root / app.config["ADMIN_PASSWORD_FILE"]
-    attempts = deque()
-    attempt_lock = threading.Lock()
+    from .login_limiter import LoginLimiter
+    limiter = LoginLimiter()
 
     def password_hash():
         configured = app.config.get("ADMIN_PASSWORD_HASH")
@@ -44,21 +42,20 @@ def install_admin(app, root, backend, attendance):
         if request.method == "POST":
             if not attendance.csrf_valid():
                 abort(400)
-            with attempt_lock:
-                cutoff = time.monotonic() - 300
-                while attempts and attempts[0] < cutoff:
-                    attempts.popleft()
-                if len(attempts) >= 10:
-                    error, code = "Too many attempts. Try again in five minutes.", 429
-                else:
-                    attempts.append(time.monotonic())
-                    supplied = request.form.get("password", "")
-                    if configured and len(supplied) <= 512 and check_password_hash(configured, supplied):
-                        session["admin_until"] = time.time() + 1800
-                        session["admin_credential"] = hashlib.sha256(configured.encode()).hexdigest()
-                        session["csrf"] = secrets.token_urlsafe(32)
-                        return redirect(url_for("admin_index"), code=303)
-                    error, code = "The admin password was not accepted.", 401
+            identity = attendance.visitor()
+            if limiter.blocked(identity):
+                error, code = "Too many attempts. Try again in five minutes.", 429
+            else:
+                supplied = request.form.get("password", "")
+                configured = configured
+                if configured and len(supplied) <= 512 and check_password_hash(configured, supplied):
+                    limiter.success(identity)
+                    session["admin_until"] = time.time() + 1800
+                    session["admin_credential"] = hashlib.sha256(configured.encode()).hexdigest()
+                    session["csrf"] = secrets.token_urlsafe(32)
+                    return redirect(url_for("admin_index"), code=303)
+                limiter.failure(identity)
+                error, code = "The admin password was not accepted.", 401
         return page("admin_login.html", configured=bool(configured), error=error), code
 
     @app.post("/admin/logout")
