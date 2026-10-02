@@ -591,3 +591,10 @@ all/none and individual controls. Native and JavaScript submissions remain suppo
 215 tests passed, compilation and whitespace checks passed. Fictional browser Submit
 confirmed both entered people, remembered identity and response persistence on reload.
 No live Sheet/cloud changes. Redeployment is required to show the new button.
+
+## Expanded upcoming assignments (2026-10-02)
+Assignment/note details start open on the upcoming page, including the featured
+this-week card. Native carets still collapse them; past details retain their
+collapsed default. Render checks and fictional browser checks at 375/1440 passed
+without overflow; collapse and reload/default expansion verified. Whitespace checks
+passed. No live Sheet/cloud changes. Redeploy to expose this display-only update.

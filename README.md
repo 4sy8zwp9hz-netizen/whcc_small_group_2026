@@ -30,7 +30,8 @@ The app loads only the project's .env; existing environment variables take prece
   an off week or a gathering that has already started, with attendance closed.
   With no entry this week, the next gathering is featured instead.
 - Upcoming and past lists are chronological. The featured meeting is not duplicated.
-- Assignments and notes expand on demand to conserve phone space.
+- Assignments and notes start expanded on this week and upcoming cards. Tap the
+  caret to collapse them. Past-meeting details start collapsed.
 - A meeting becomes past at its start time; no duration/end time was supplied.
 - Canceled meetings retain any recorded details but do not request missing assignments.
 - Discussion leader, host, food, and childcare default to required assignments.
