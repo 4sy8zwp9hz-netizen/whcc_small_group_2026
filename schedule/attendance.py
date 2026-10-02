@@ -13,6 +13,9 @@ from flask import jsonify, redirect, render_template, request, session, url_for
 def assignment_parts(field, value, household):
     """Match complete assignment names, keeping separators and text unchanged."""
     normalize = lambda text: " ".join(text.split()).casefold()
+    if field in {"host", "food"}:
+        normalize_name = normalize
+        normalize = lambda text: re.sub(r"^the\s+", "", normalize_name(text))
     names = set()
     if household and field in {"discussion_leader", "childcare", "host", "food"}:
         if field in {"host", "food"}:

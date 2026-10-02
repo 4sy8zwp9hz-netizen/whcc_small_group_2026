@@ -315,3 +315,29 @@ def test_assignment_highlights_follow_cookie_and_remain_escaped():
     assert '<mark class="own-assignment">' not in client.get('/past').text
     assert client.post('/household/back',data={'csrf':csrf}).status_code == 303
     assert '<mark class="own-assignment">' not in client.get('/').text
+
+
+def test_household_assignment_highlights_ignore_only_leading_the():
+    from schedule.attendance import assignment_parts
+    household = {'name': 'The Examples', 'members':[{'name':'Alex Example'}]}
+    for field in ('host', 'food'):
+        value = 'Examples / Others / Example / Exampleson'
+        parts = assignment_parts(field, value, household)
+        assert ''.join(text for text, _ in parts) == value
+        assert [text for text, own in parts if own] == ['Examples']
+        assert assignment_parts(field, '  THE   Examples  ', household) == [('  THE   Examples  ', True)]
+        assert assignment_parts(field, 'The Examples', {'name':'Examples','members':[]}) == [('The Examples',True)]
+    assert assignment_parts('childcare', 'Examples', household) == [('Examples', False)]
+
+
+def test_short_household_names_render_highlighted_for_food_and_host():
+    source = Source()
+    source.rows[1].update({'host': 'Examples', 'food': 'Examples / Others', 'childcare': 'Alex'})
+    app = make_app(source)
+    client = app.test_client()
+    key, csrf, _ = setup(client)
+    assert submit(client,key,csrf,household='The Examples').status_code == 200
+    page = client.get('/').text
+    assert page.count('<mark class="own-assignment">Examples</mark>') == 2
+    assert '<mark class="own-assignment">Examples</mark> / Others' in page
+    assert '<mark class="own-assignment">Alex</mark>' in page

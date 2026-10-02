@@ -651,3 +651,13 @@ fixed 30-day remembered group access, independent 30-minute admin access. Group
 logout/expiry preserves household identity; cookies are browser/hostname specific
 and rely on stable signing keys. Live Cloud Run cookie not inspected this turn.
 No live Sheet/cloud changes; pull and redeploy to show this display update.
+
+## Food/host household alias correction (2026-10-02)
+Host and food highlighting now ignores an optional leading The in both the roster
+household and assignment token. Whole-token matching remains: no substring matches,
+no guessed singular/plural surname conversions. Displayed text and stored data are
+unchanged; person-role matching is unchanged. Fictional rendered regression verifies
+food/host multi-assignment aliases and unchanged member highlights. 224 tests passed,
+compilation and whitespace checks passed. Layout is unchanged from the previous
+375/1440 browser checks; no new visual check needed for the text matching fix.
+No live Sheet/cloud changes. Pull and redeploy to show the correction.
