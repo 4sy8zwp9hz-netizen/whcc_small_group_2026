@@ -1,12 +1,11 @@
 """Backed-up explicit compaction; fictional data and no Google calls."""
 import copy
-from urllib.parse import unquote
 import pytest
 from schedule.backend import DataError
 from schedule.recovery import BackendRecovery
 from schedule.state_patch import entities
 from test_admin_recovery import RecoveryTransport
-from test_review_fixes import make_google, legacy_payload
+from test_review_fixes import make_google
 from test_backend_admin import login
 from test_cloud_run import HASH, group_login
 
@@ -29,8 +28,6 @@ class RebuildTransport(RecoveryTransport):
                 if self.lose_rebuild_ack:
                     raise TimeoutError("fictional unknown replacement acknowledgment")
                 return {}
-        if method == "POST" and suffix.endswith(":append"):
-            assert unquote(suffix).endswith("!A:A:append")
         return super().request(method, suffix, **kwargs)
 
 
@@ -84,7 +81,9 @@ def test_rebuild_preserves_clear_response_and_stale_event_rejection():
     desired[0]["responses"] = []
     adapter.commit(desired, base)
     with pytest.raises(DataError):
-        adapter.commit(base, base)  # old predecessor, cannot resurrect attendance
+        stale = copy.deepcopy(base)
+        stale[0]["record"]["values"]["notes"] = "Stale fictional edit"
+        adapter.commit(stale, base)  # old predecessor, cannot resurrect attendance
     transport.rows[1][3] = "Visible damage"
     plan = recovery.rebuild_preview()
     assert plan["responses"] == 0 and plan["households"] == 1 and plan["rejected"] == 1

@@ -202,22 +202,33 @@ class SheetBackend:
         """Append a small mutation and return verified state; Sheets is not immutable."""
         from .state_patch import diff
         self.validate(items)
-        event = {"_event": 2, "expected": digest(base), "patch": diff(base, items)}
+        patch = diff(base, items)
+        if not any(patch.values()):
+            # Semantically identical state needs no event (e.g. optional empty
+            # household lists). Return the latest verified state, not a stale base.
+            state = self.read()
+            if state is None:
+                raise DataError("The backend tab is missing. Restore it before retrying.")
+            return state
+        event = {"_event": 2, "expected": digest(base), "patch": patch}
         # Content-derived identity stays identical for a retry, even after restart.
         event["id"] = hashlib.sha256(encode(event).encode()).hexdigest()[:32]
         row = self.event_row(event)
         if len(row[16]) > 49000:
             raise DataError("This update exceeds the supported cell size. Reduce the batch or recover manually with all writers stopped.")
-        # Search only the identity column so sparse event rows cannot shift the
-        # logical table to another column. The 17-value row still writes A:Q.
-        target = "'" + self.title.replace("'", "''") + "'!A:A"
+        properties = self.properties()
+        if not properties or "sheetId" not in properties:
+            raise DataError("The backend tab identity could not be verified. Nothing was appended.")
+        # appendCells targets the numeric tab and appends after its last data row;
+        # unlike values.append it never infers a logical table or inserts above it.
+        cells = [{"userEnteredValue": {"stringValue": value}} for value in row]
+        mutation = {"appendCells": {"sheetId": properties["sheetId"],
+                    "rows": [{"values": cells}], "fields": "userEnteredValue"}}
         # At most two append attempts, with the exact same event ID and payload.
         # Unknown acceptance is checked before retrying; replay deduplicates late copies.
         for attempt in range(2):
             try:
-                self.request("POST", "/values/" + quote(target, safe="") + ":append",
-                             params={"valueInputOption": "RAW", "insertDataOption": "INSERT_ROWS"},
-                             json={"values": [row]})
+                self.request("POST", ":batchUpdate", json={"requests": [mutation]})
             except Exception as exc:
                 if not self.retryable(exc):
                     raise

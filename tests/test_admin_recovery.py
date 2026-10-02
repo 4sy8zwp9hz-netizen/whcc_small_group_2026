@@ -30,6 +30,9 @@ class RecoveryTransport(Transport):
         if method == "POST" and suffix == ":batchUpdate":
             self.backup_calls.append(copy.deepcopy(kwargs))
             request = kwargs['json']['requests'][0]
+            if 'appendCells' in request:
+                self.backup_calls.pop()
+                return super().request(method, suffix, **kwargs)
             if 'addSheet' in request:
                 self.backup_title = request['addSheet']['properties']['title']
                 return {'replies':[{'addSheet':{'properties':{'sheetId':987}}}]}

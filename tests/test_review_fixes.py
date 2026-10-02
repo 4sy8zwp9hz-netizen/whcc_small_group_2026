@@ -43,11 +43,15 @@ class Transport:
                     return {"values": copy.deepcopy(self.rows)}
                 return {"sheets": [{"properties": {"title": "App Backend", "sheetId": 123,
                                                      "gridProperties": {"rowCount": 1000}}}]}
-        assert suffix.endswith(":append"), "No full-tab writes permitted"
+        assert suffix == ":batchUpdate", "Only typed append writes permitted"
+        mutation = kwargs["json"]["requests"][0]
+        assert set(mutation) == {"appendCells"}, "No full-tab writes permitted"
+        append = mutation["appendCells"]
+        assert append["sheetId"] == 123 and append["fields"] == "userEnteredValue"
         if self.barrier:
             self.barrier.wait(timeout=10)
         with self.lock:
-            row = copy.deepcopy(kwargs["json"]["values"][0])
+            row = [cell["userEnteredValue"]["stringValue"] for cell in append["rows"][0]["values"]]
             self.posts.append(row)
             if self.delay:
                 self.pending.append(row)

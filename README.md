@@ -780,9 +780,10 @@ permissions or network failures. The original calendar is never written. Sheets 
 no transactional compare-and-swap: concurrent writes during repair are unsafe despite
 fingerprint checks. Ordinary restart recovery remains supported; altered/deleted
 stored history may still require manual stopped-writer recovery from backups.
-Normal full-tab write() remains disabled. Normal update appends search only column A
-for the logical table, then write their 17 values to A:Q; real Sheets append placement
-and this new repair need post-deployment verification. No new secrets are required.
+Normal full-tab write() remains disabled. Normal updates use numeric-tab appendCells requests with literal values in A:Q,
+appending after the last data row without logical-table detection. Semantically
+empty changes do not create events. Real Sheets append placement and this repair
+need post-deployment verification. No new secrets are required.
 
 Admin editing also remains available during an original-calendar outage when the
 production backend validates. Every save rereads the backend, requires the same
@@ -790,3 +791,14 @@ meeting revision and confirms Sheets persistence; failed writes roll back. When
 calendar refresh resumes, the existing three-way merge preserves app overrides and
 flags simultaneous changes for leader resolution. An invalid/unreachable backend
 still blocks saves until repair/access succeeds.
+
+### Header moved below empty updates
+If old code inserted an empty App update above the header, deploy the writer fix
+before rebuilding again. /admin/recovery/rebuild now locates the exact managed
+header and can archive recognized version-two empty updates above it. Their IDs
+and payloads must validate; meaningful/unrecognized rows before the header refuse
+repair. Preview reports the displaced header row. After backup and confirmation,
+rebuild restores the header to row 1. Do not manually delete/move rows or change
+hidden state. Stop old revisions/writers before repair; verify refresh and a later
+admin/attendance update after it. Numeric-tab appendCells replaces values.append;
+normal full-tab replacement remains disabled. Backups are still retained.

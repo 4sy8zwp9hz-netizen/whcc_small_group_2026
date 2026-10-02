@@ -483,3 +483,34 @@ No live spreadsheet or secrets accessed/modified. gcloud and Docker are unavaila
 on this workstation. User must perform Cloud Shell source deployment and verify real
 backend rebuild, subsequent admin/attendance writes and empty-cache restart. No live
 repair/deployment has been performed by the agent. Keep backup tabs until verified.
+
+## Header displacement writer fix (2026-10-02)
+After the previous rollout, the owner reported successful rebuild followed by an
+empty version-two App update in row 1 and the header in row 2. The earlier tests
+modeled values.append as always appending below all rows and missed this observed
+runtime placement failure. The previous repair was insufficient because a later
+refresh could damage the repaired layout again. No live sheet was accessed here.
+
+Replaced values.append/logical-table detection with numeric-sheetId appendCells in
+batchUpdate, explicit userEnteredValue string literals, same stable event IDs and
+bounded verification/retry. According to the official Sheets API, appendCells adds
+after the last data row. No normal replacement path is enabled. Empty semantic
+patches now skip mutation and return freshly verified state, handling optional empty
+household-list serialization differences without repeated empty events.
+
+Explicit rebuild can locate the exact header below validated EMPTY version-two
+updates, replay retained data, verify a literal backup and restore the header to row
+1. It refuses meaningful/unrecognized leading rows and invalid stored payloads.
+Auth/CSRF/stale preview/stopped-writer confirmation and unknown-ack checks remain.
+Existing meeting links, profiles/member IDs and historical responses remain preserved.
+Deploy this corrected writer before repairing again; stop all old writers/revisions.
+
+Full suite: 201 passed, including seven new cases for one/multiple empty prepended
+updates, preservation and subsequent write placement, unsupported leading data,
+no-op suppression with a newer writer, and route rebuild plus automatic refresh.
+Existing two-writer/stale-event/unknown-ack/empty-cache tests now exercise appendCells.
+Compileall and whitespace checks passed. Source/docs/fictional fixtures reviewed for
+publication; no copied private event IDs, sheet rows or credentials. The owner
+previously authorized publication to main; this is the follow-up reliability fix.
+Container and actual Google/Cloud Run append/recovery checks remain outstanding.
+No deployment, live repair, cloud resources or real secret changes were performed.

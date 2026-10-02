@@ -114,3 +114,10 @@ blindly. Preserve meeting IDs, profiles/member IDs and effective historical RSVP
 Visible-only manual edits are archived, not imported; corrupt stored data refuses
 rebuild. Original calendar stays read-only. This is not a CAS or concurrent repair.
 Do not access live Sheets, publish or deploy without explicit authorization.
+
+Normal events must use appendCells targeted by numeric backend sheetId, with literal
+stringValue cells and fields=userEnteredValue. Never use values.append logical-table
+search; a reported runtime failure inserted an event above the header. Skip empty
+semantic mutations, returning freshly verified state. Explicit rebuild may locate
+a displaced exact header only when all preceding rows are validated empty v2 events;
+never reorder meaningful updates or guess a column mapping.

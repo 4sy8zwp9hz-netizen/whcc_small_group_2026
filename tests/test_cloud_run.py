@@ -183,18 +183,21 @@ def test_real_adapter_append_handles_lost_ack_and_never_rewrites():
     calls = []
     def request(method, suffix="", **kwargs):
         calls.append((method, suffix, kwargs))
-        if suffix.endswith(":append"):
-            table.extend(kwargs["json"]["values"])
+        if method == "POST" and suffix == ":batchUpdate":
+            mutation = kwargs["json"]["requests"][0]
+            assert set(mutation) == {"appendCells"}
+            table.extend([[cell["userEnteredValue"]["stringValue"] for cell in row["values"]]
+                          for row in mutation["appendCells"]["rows"]])
             raise TimeoutError("acknowledgment lost")
         if "/values/" in suffix:
             return {"values": copy.deepcopy(table)}
-        return {"sheets": [{"properties": {"title": "App Backend"}}]}
+        return {"sheets": [{"properties": {"title": "App Backend", "sheetId": 123}}]}
     adapter.request = request
     adapter.commit(desired, base)
     assert adapter.read() == desired
     write = next(call for call in calls if call[0] == "POST")
-    assert write[2]["params"]["valueInputOption"] == "RAW"
-    assert not any(":batchUpdate" in call[1] for call in calls)
+    assert write[2]["json"]["requests"][0]["appendCells"]["fields"] == "userEnteredValue"
+    assert not any(":append" in call[1] for call in calls)
     stale = copy.deepcopy(base)
     stale[0]["record"]["values"]["topic"] = "Losing overlap"
     with pytest.raises(DataError):

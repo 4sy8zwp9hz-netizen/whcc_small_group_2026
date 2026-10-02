@@ -100,11 +100,29 @@ class BackendRecovery:
     def rebuild_preview(self):
         """Recover validated hidden state; visible-only edits are archived, not imported."""
         table = self.raw()
-        if not table or table[0] != HEADERS:
+        if not table:
+            raise DataError("The backend is empty. Restore a complete backup before rebuilding.")
+        header = next((i for i, row in enumerate(table) if row == HEADERS), None)
+        if header is None:
             raise DataError("Backend columns do not match. Restore the complete header before rebuilding.")
+        # The old values.append path could insert a no-op update ABOVE the header.
+        # Recover only this recognized case; never guess reordered real mutations.
+        displaced = []
+        try:
+            for row in table[:header]:
+                payload = json.loads(row[16])
+                if (not isinstance(payload, dict) or payload.get("_event") != 2
+                        or set(payload.get("patch", {})) != {"cleared", "profiles", "records", "responses"}
+                        or any(value != [] for value in payload["patch"].values())):
+                    raise DataError("Rows before the header are not recognized empty updates. Rebuild was refused.")
+                displaced.append(payload)
+        except (KeyError, IndexError, TypeError, ValueError) as exc:
+            if isinstance(exc, DataError):
+                raise
+            raise DataError("Rows before the header cannot be safely recovered.") from None
         baseline, events, archived = [], [], []
         try:
-            for number, row in enumerate(table[1:], 2):
+            for number, row in enumerate(table[header + 1:], header + 2):
                 if not any(value != "" for value in row):
                     continue
                 stored = row[16] if len(row) > 16 else ""
@@ -120,6 +138,7 @@ class BackendRecovery:
                     if events:
                         raise DataError("Stored meetings follow update events. Restore their original order before rebuilding.")
                     baseline.append(payload)
+            events.extend(reversed(displaced))
             self.publisher.validate(baseline)
             state, receipts = self.publisher.replay(baseline, events)
             self.publisher.validate(state)
@@ -136,7 +155,7 @@ class BackendRecovery:
         return {"token": digest(self.normalized(table)), "table": table, "state": state,
                 "meetings": len(records), "households": len(profiles), "responses": len(responses),
                 "events": len(events), "rejected": sum(not value for value in receipts.values()),
-                "rows": archived}
+                "rows": archived, "header_row": header + 1}
 
     def rebuild(self, token):
         plan = self.rebuild_preview()
