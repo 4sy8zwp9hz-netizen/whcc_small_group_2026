@@ -215,6 +215,10 @@ class Attendance:
         try:
             with self.store.lock:
                 backend = self.app.extensions.get("backend")
+                backup = None
+                if backend and backend.strict:
+                    with self.store.connection:
+                        backup = backend.refresh_remote()
                 if backend:
                     # An admin may have edited after this request read the cache.
                     current = next((m for m in self.cache.parser(backend.rows())
@@ -226,13 +230,21 @@ class Attendance:
                     request.form.get("people", ""), request.form.getlist("attending"),
                     self.now().isoformat(),
                 )
+                if backend and backend.strict and not backend.publish(force=True):
+                    with self.store.connection:
+                        backend.restore(backup, replace=True)
+                    return self.error("Your response was not confirmed in Sheets. Reload before retrying.", 503)
         except ValueError as exc:
-            return self.error(str(exc), 400)
+            from .data import DataError
+            return self.error(str(exc), 503 if isinstance(exc, DataError) else 400)
         except sqlite3.Error:
             self.app.logger.warning("Attendance storage unavailable")
             return self.error("Attendance could not be saved. Please try again.", 503)
+        except Exception:
+            self.app.logger.warning("Attendance update unavailable")
+            return self.error("Attendance could not be confirmed. Reload before retrying.", 503)
         backend = self.app.extensions.get("backend")
-        synced = backend.publish(force=True) if backend else True
+        synced = backend.publish(force=True) if backend and not backend.strict else True
         if request.accept_mimetypes.best != "application/json":
             return redirect(url_for("upcoming", _anchor="meeting-" + meeting_id), code=303)
         context = self.context(snapshot.meetings, snapshot)

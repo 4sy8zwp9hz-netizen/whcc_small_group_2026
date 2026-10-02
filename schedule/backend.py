@@ -70,6 +70,7 @@ class Backend:
         self.store = attendance.store
         self.source, self.parser = cache.source, cache.parser
         self.publisher = publisher
+        self.strict = app.config.get("STRICT_DURABILITY", False)
         self.retry_at = 0
         self.sync_error = ""
         self.scope = hashlib.sha256(attendance.namespace.encode()).hexdigest()
@@ -110,6 +111,10 @@ class Backend:
             (self.scope, record["id"], encode(record)))
 
     def read(self):
+        if self.strict:
+            with self.store.lock, self.store.connection:
+                self.refresh_remote()
+                self.cache.snapshot = Snapshot(self.cache.parser(self.rows()), self.attendance.now(), True)
         meetings = self.parser(self.source.read())
         incoming = {}
         for meeting in meetings:
@@ -131,7 +136,10 @@ class Backend:
             for key in old.keys() - incoming.keys():
                 if old[key]["source_date"]:
                     self.put(merge_record(old[key], None))
-        self.publish()
+        if not self.publish(force=self.strict) and self.strict:
+            with self.store.lock, self.store.connection:
+                self.refresh_remote()
+            raise DataError("The schedule refresh could not be confirmed in Sheets.")
         return self.rows()
 
     def rows(self):
@@ -146,6 +154,7 @@ class Backend:
     def edit(self, key, revision, values, resolutions):
         validate_values(values)
         with self.store.lock, self.store.connection:
+            backup = self.refresh_remote() if self.strict else None
             record = next((r for r in self.records() if r["id"] == key), None)
             if record is None or str(record["revision"]) != str(revision):
                 raise DataError("This meeting changed while you were editing. Reload and review the latest values.")
@@ -169,8 +178,12 @@ class Backend:
             record["values"], record["conflicts"] = values, {}
             record["revision"] += 1
             self.put(record)
+            if self.strict and not self.publish(force=True):
+                self.restore(backup, replace=True)
+                raise DataError("The edit was not confirmed in Sheets. Reload before retrying.")
         self.invalidate()
-        self.publish(force=True)
+        if not self.strict:
+            self.publish(force=True)
 
     def invalidate(self):
         # Call outside the attendance lock to maintain cache -> store lock ordering.
@@ -192,16 +205,41 @@ class Backend:
                 replies.append({"id": public_id, "name": row["name"], "members": json.loads(row["members"]),
                                 "attending": json.loads(row["attending"]), "updated_at": row["updated_at"]})
             result.append({"record": record, "responses": sorted(replies, key=lambda r: r["id"])})
+        if result:
+            households = []
+            for row in self.store.connection.execute("SELECT id,name,members FROM households ORDER BY id"):
+                identity = row["id"]
+                public_id = identity[7:] if identity.startswith("import:") else hashlib.sha256(identity.encode()).hexdigest()
+                households.append({"id": public_id, "name": row["name"], "members": json.loads(row["members"])})
+            result[0]["households"] = sorted(households, key=lambda h: h["id"])
         return result
 
     def restore_if_available(self):
         remote = self.publisher.read()
         if remote is None:
             return
+        self.restore(remote)
+
+    def refresh_remote(self):
+        remote = self.publisher.read()
+        if remote is None:
+            raise DataError("Create the App Backend tab before starting production.")
+        self.restore(remote, replace=True)
+        return remote
+
+    def restore(self, remote, replace=False):
         self.publisher.validate(remote)
+        if replace:
+            self.store.connection.execute("DELETE FROM responses")
+            self.store.connection.execute("DELETE FROM households")
+            self.store.connection.execute("DELETE FROM app_schedule WHERE scope=?", (self.scope,))
         for item in remote:
             record = item["record"]
             self.put(record)
+            roster = item.get("households", [])
+            for household in roster:
+                self.store.connection.execute("INSERT OR IGNORE INTO households VALUES(?,?,?)",
+                                              ("import:" + household["id"], household["name"], encode(household["members"])))
             for reply in item["responses"]:
                 visitor = "import:" + reply["id"]
                 existing = self.store.connection.execute("SELECT members FROM households WHERE id=?", (visitor,)).fetchone()
@@ -231,7 +269,10 @@ class Backend:
                 if actual != wanted:
                     if not expected or actual != expected:
                         raise DataError("The backend tab changed outside this app. No data was overwritten. Reconcile it before retrying.")
-                    self.publisher.write(desired)
+                    if hasattr(self.publisher, "commit"):
+                        self.publisher.commit(desired, remote)
+                    else:
+                        self.publisher.write(desired)
                     if digest(self.publisher.read()) != wanted:
                         raise DataError("Google did not confirm the backend contents. Retry sync.")
                 with self.store.connection:
@@ -241,7 +282,8 @@ class Backend:
             except Exception as exc:
                 self.app.logger.warning("Backend sync failed (%s)", type(exc).__name__)
                 self.sync_error = (str(exc) if isinstance(exc, DataError)
-                                   else "Google sync is unavailable. Changes are saved locally and pending sync.")
+                                   else ("Google sync is unavailable. The update was not confirmed." if self.strict
+                                         else "Google sync is unavailable. Changes are saved locally and pending sync."))
             self.retry_at = time.monotonic() + 60
         return not self.sync_error
 

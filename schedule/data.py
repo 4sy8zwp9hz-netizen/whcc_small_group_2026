@@ -79,14 +79,11 @@ class GoogleSheetsSource:
     def read(self):
         # Lazy import/authentication: CSV mode never needs Google credentials.
         from google.auth.transport.requests import AuthorizedSession
-        from google.oauth2 import service_account
 
-        if not all((self.spreadsheet_id, self.sheet_range, self.credentials_path)):
+        if not all((self.spreadsheet_id, self.sheet_range)):
             raise DataError("Google Sheets configuration is incomplete.")
-        credentials = service_account.Credentials.from_service_account_file(
-            self.credentials_path,
-            scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"],
-        )
+        from .google_credentials import credentials_for
+        credentials = credentials_for(self.credentials_path, readonly=True)
         url = (
             "https://sheets.googleapis.com/v4/spreadsheets/"
             + quote(self.spreadsheet_id, safe="")

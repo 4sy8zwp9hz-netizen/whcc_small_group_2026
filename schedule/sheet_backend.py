@@ -1,9 +1,11 @@
 """Write only the explicitly configured app tab; original calendar stays read-only."""
 import json
 import re
+import uuid
+import copy
 from urllib.parse import quote
 
-from .backend import EDIT_FIELDS, encode, validate_values
+from .backend import EDIT_FIELDS, encode, validate_values, digest
 from .data import DataError
 
 HEADERS = ["Meeting ID", "Date", "Time (Central)", "Location", "Topic", "Discussion leader",
@@ -24,9 +26,8 @@ class SheetBackend:
 
     def request(self, method, suffix="", **kwargs):
         from google.auth.transport.requests import AuthorizedSession
-        from google.oauth2 import service_account
-        credentials = service_account.Credentials.from_service_account_file(
-            self.credentials_path, scopes=["https://www.googleapis.com/auth/spreadsheets"])
+        from .google_credentials import credentials_for
+        credentials = credentials_for(self.credentials_path)
         with AuthorizedSession(credentials) as session:
             response = session.request(method, self.base_url + suffix, timeout=15, **kwargs)
             response.raise_for_status()
@@ -68,10 +69,14 @@ class SheetBackend:
             if not isinstance(record["conflicts"], dict) or not set(record["conflicts"]).issubset({*EDIT_FIELDS, "_removed"}):
                 raise DataError("Invalid backend conflicts.")
             reply_ids = set()
-            for reply in item["responses"]:
-                if not re.fullmatch(r"[a-f0-9]{64}", reply["id"]) or reply["id"] in reply_ids:
+            profiles = item.get("households", [])
+            if not isinstance(profiles, list):
+                raise DataError("Invalid household profiles.")
+            for reply in [*item["responses"], *[{**profile, "attending": []} for profile in profiles]]:
+                if not re.fullmatch(r"[a-f0-9]{64}", reply["id"]) or (reply in item["responses"] and reply["id"] in reply_ids):
                     raise DataError("Backend household IDs must be unique.")
-                reply_ids.add(reply["id"])
+                if reply in item["responses"]:
+                    reply_ids.add(reply["id"])
                 if not isinstance(reply["name"], str) or not 1 <= len(reply["name"]) <= 60:
                     raise DataError("Invalid backend household.")
                 members = reply["members"]
@@ -93,15 +98,84 @@ class SheetBackend:
         if not table or table[0] != HEADERS:
             raise DataError("The backend tab has unexpected columns. Nothing was overwritten.")
         try:
-            items = [json.loads(row[16]) for row in table[1:] if any(str(v).strip() for v in row)]
-            self.validate(items)
-            if table != self.table(items):
+            baseline = []
+            events = []
+            for row in table[1:]:
+                if not any(str(v).strip() for v in row):
+                    continue
+                payload = json.loads(row[16])
+                if isinstance(payload, dict) and payload.get("_event") == 1:
+                    if row != self.event_row(payload):
+                        raise DataError("A backend update was edited directly.")
+                    events.append(payload)
+                else:
+                    if events:
+                        raise DataError("Do not reorder the managed backend tab.")
+                    baseline.append(payload)
+            self.validate(baseline)
+            if table[1:1 + len(baseline)] != self.table(baseline)[1:]:
                 raise DataError("The managed backend tab was edited directly. No data was overwritten.")
-            return items
+            state, receipts = self.replay(baseline, events)
+            self.receipts = receipts
+            return state
         except (KeyError, IndexError, TypeError, ValueError) as exc:
             if isinstance(exc, DataError):
                 raise
             raise DataError("The backend tab contains invalid app records. Nothing was overwritten.") from None
+
+    @staticmethod
+    def event_row(event):
+        return ["event:" + event["id"], "", "", "", "App update", "", "", "", "", "", "", "", "", "", "", "", encode(event)]
+
+    @classmethod
+    def replay(cls, baseline, events):
+        state = copy.deepcopy(baseline)
+        receipts = {}
+        payloads = {}
+        for event in events:
+            identity = event["id"]
+            if not re.fullmatch(r"[a-f0-9]{32}", identity):
+                raise DataError("Invalid backend update identity.")
+            if identity in receipts:
+                if payloads[identity] != event:
+                    raise DataError("Duplicate update identity has different contents.")
+                continue
+            cls.validate(event["changes"])
+            if not isinstance(event["expected"], str) or not re.fullmatch(r"[a-f0-9]{64}", event["expected"]):
+                raise DataError("Invalid backend update version.")
+            accepted = event["expected"] == digest(state)
+            if accepted:
+                records = {item["record"]["id"]: item for item in state}
+                records.update({item["record"]["id"]: item for item in event["changes"]})
+                state = sorted(records.values(), key=lambda item: (item["record"]["values"]["date"],
+                               item["record"]["values"]["time"], item["record"]["id"]))
+                cls.validate(state)
+            receipts[identity] = accepted
+            payloads[identity] = event
+        return state, receipts
+
+    def commit(self, items, base):
+        """Append one optimistic event; never rewrite accepted history."""
+        self.validate(items)
+        old = {item["record"]["id"]: item for item in base}
+        if set(old) - {item["record"]["id"] for item in items}:
+            raise DataError("Deleting backend records is not supported.")
+        changes = [item for item in items if old.get(item["record"]["id"]) != item]
+        event = {"_event": 1, "id": uuid.uuid4().hex, "expected": digest(base), "changes": changes}
+        row = self.event_row(event)
+        if len(row[16]) > 49000:
+            raise DataError("This update exceeds the Sheets cell limit. Split it into smaller changes.")
+        target = "'" + self.title.replace("'", "''") + "'!A:Q"
+        try:
+            self.request("POST", "/values/" + quote(target, safe="") + ":append",
+                         params={"valueInputOption": "RAW", "insertDataOption": "INSERT_ROWS"},
+                         json={"values": [row]})
+        except Exception:
+            # A timed-out append may still have persisted; inspect its receipt once.
+            pass
+        self.read()
+        if not self.receipts.get(event["id"]):
+            raise DataError("The update was not confirmed or another writer changed the backend. Reload before retrying.")
 
     def cells_request(self, sheet_id, items, old_rows=0):
         rows = self.table(items)

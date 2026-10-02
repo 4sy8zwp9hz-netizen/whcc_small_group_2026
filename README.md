@@ -10,7 +10,7 @@ Install Python 3.12 or newer and Git. In PowerShell, from your personal projects
 git clone https://github.com/4sy8zwp9hz-netizen/whcc_small_group_2026.git whcc-small-group-schedule
 cd whcc-small-group-schedule
 py -3 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 .\.venv\Scripts\python.exe -m flask --app app run
 ```
 Open http://127.0.0.1:5000. No virtual environment activation or execution-policy
@@ -45,7 +45,8 @@ The app loads only the project's .env; existing environment variables take prece
 - First-load failure returns a useful HTTP 503 page. A valid header-only sheet is
   a successful empty schedule.
 - The raw calendar cache is in memory per process. With SCHEDULE_EDITING=true,
-  the effective schedule and pending changes persist in the private SQLite database.
+  in development the effective schedule and pending changes persist in private SQLite.
+  Production uses Sheets durability and treats SQLite as an ephemeral cache.
   On restart, a failed source refresh shows persisted data with a stale warning.
 
 
@@ -112,7 +113,7 @@ For a private local CSV, store it under private/ and set CSV_PATH=private/schedu
 Only data/sample.csv is eligible for tracking under data/. The fictional sample is
 dated September-November 2026; advance those dates if demonstrating the app later.
 
-## Google Sheets: server-side, read-only
+## Google Sheets: local server credentials and read-only calendar
 1. In your personal Google Cloud project, enable the Google Sheets API.
 2. Create a dedicated service account. It does not need broad project roles.
 3. Create/download its JSON key to a secure location outside this repository.
@@ -164,39 +165,6 @@ git diff --check
 ```
 Tests use deterministic dates and mock Google authentication/HTTP calls.
 See PROJECT_STATUS.md for the latest observed results and visual checks.
-
-## Future Render deployment (not deployed)
-Before deployment, decide who may access the website and how that access is enforced.
-**A private Google Sheet does not make the website private.**
-The admin area requires a password, but the member-facing pages have no website
-authentication: anyone with network access can read them and submit attendance.
-Decide which addresses, names, notes, and assignments are appropriate to display.
-An access gateway is one possible future choice; no member account system is implemented.
-
-For a future Linux Render web service:
-- Build command: `pip install -r requirements.txt`
-- Start command: `gunicorn --workers 1 --threads 4 --bind 0.0.0.0:$PORT app:app`
-- Configure a supported Python 3.12+ runtime and environment values.
-- Set COOKIE_SECURE=true and a persistent random SECRET_KEY in server secrets.
-- Attendance needs durable storage: set RSVP_DATABASE to a persistent disk path
-  for a single instance, or migrate to a managed database before scaling. Default
-  ephemeral storage can lose attendance during redeploys. No disk was purchased.
-- Mount the Google service-account key as a secret file; point
-  GOOGLE_APPLICATION_CREDENTIALS to its absolute server path.
-- One worker maintains one shared process cache; multiple workers/instances have
-  independent caches. This prototype supports one running server/worker with
-  multiple threads. Do not run competing copies against the same backend tab.
-- Back up SQLite and signing secrets. Use stronger admin access and external rate
-  limiting before internet-facing deployment; local login throttling is process-local.
-- Flask's development server is for local testing only. No service was purchased,
-  created, or deployed for this proof of concept.
-
-References: [Render Flask guide](https://render.com/docs/deploy-flask),
-[Flask Gunicorn guidance](https://flask.palletsprojects.com/en/stable/deploying/gunicorn/),
-[Google Sheets scopes](https://developers.google.com/workspace/sheets/api/scopes),
-[Render persistent disks](https://render.com/docs/disks),
-[Flask cookie security](https://flask.palletsprojects.com/en/stable/web-security/),
-[Google batch update behavior](https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/batchUpdate).
 
 
 ## Admin editing and the App Backend tab
@@ -268,28 +236,36 @@ account keys, session secrets, or raw browser identity tokens are sent to Sheets
   The admin UI edits existing meetings and can cancel them; it has no delete button.
 
 ### Writes, outages, and recovery
-Admin changes and member responses commit to local SQLite first, then attempt
-Google publication. A Google outage shows a pending-sync message; changes survive
-a restart and retry on later page requests, no more often than about once a minute,
-or immediately from the admin retry button. There is no unattended background job.
-Do not delete local data while writes are pending.
+Development mode retains local SQLite and queues failed syncs; preserve the database
+until pending writes finish. Production (`APP_ENV=production`) treats SQLite as an
+ephemeral cache. Every write refreshes the durable backend under a process lock and
+must receive confirmed Sheets persistence before the app reports success. Failures
+return an error and roll back provisional cache changes. A lost network acknowledgment
+can mean an update reached Sheets despite the error: reload before retrying.
 
-Only one app server should write this backend. The writer checks the last published
-snapshot before updating and verifies the result afterward. Unexpected backend edits
-or another server's changes stop publication instead of overwriting them. Google
-Sheets does not support an atomic conditional update, so this is not a multi-writer
-database. Do not hand-edit, sort, or add formulas to the managed tab.
+The original calendar stays read-only. The App Backend starts with its existing
+meeting rows, then receives immutable append-only update rows. Each update includes
+the digest of its expected predecessor. Replay in sheet order accepts only a matching
+predecessor; overlapping stale writers are rejected, and duplicate update IDs are
+idempotent. Accepted history is never rewritten by normal sync. Original visible
+meeting rows are the initial snapshot; later logical values/counts are shown by the
+app, not refreshed into those initial cells. Do not hand-edit, sort, delete, or add
+formulas to this tab. Back up the full tab, including the hidden state column.
 
-For an external-edit conflict, preserve the local database and a private copy of the
-backend, stop competing writers, and reconcile them deliberately. There is no
-automatic destructive reset or last-writer-wins switch. Keep a matching database and
-session signing secret when moving the running server. A new database can restore
-schedule/attendance from Sheets; existing browser identity still requires its cookie
-and the original signing secret. A new machine does not inherit browser cookies.
+Stop older app versions before using this version: their full-tab writer can destroy
+update history. Keep max instances 1 and one Gunicorn worker. The log protects against
+brief replacement overlap, but Sheets remains a small proof-of-concept store, not a
+general transactional database. Updates exceeding 49,000 characters are rejected;
+the log grows with use and is reread on refresh. Compaction is a future maintenance
+feature and must only happen offline with all writers stopped and a verified backup.
 
-If the sheet is shared with anyone who has the link, that also exposes the new tab,
-including attendance details. Admin authentication protects editing through the app;
-it does not change spreadsheet sharing or protect the public member pages.
+Fresh instances restore schedule overrides, profiles/members and responses from the
+backend before reading the source calendar. A source outage preserves that restored
+schedule with a stale warning and disables RSVP. If the backend cannot be read and no
+cache exists, show the unavailable state. Browser identity survives only with the same
+cookie and stable signing key. Shared group/admin passwords are separate; cookies
+identify browsers, not verified people. Restrict the spreadsheet's own sharing too:
+website login does not protect a sheet shared with anyone who has its link.
 
 ## Continue with Codex
 Read AGENTS.md, README.md, and PROJECT_STATUS.md first. Run the validation commands,
@@ -364,3 +340,240 @@ still works without Google authentication.
 A fully fictional calendar fixture lives at tests/fixtures/calendar.csv. Tests
 cover two-row grouping, year rollover, events, off-week overrides, duplicate dates,
 notes, ignored columns, malformed refreshes, and the authenticated adapter contract.
+
+## Google Cloud Run Deployment
+
+Preparation only: no cloud resources or deployment have been performed. Manual
+source deployment uses this Dockerfile through Cloud Build. There is no CI/CD,
+SQL database, Redis, or persistent disk. Later GitHub automation can reuse these
+commands through Workload Identity Federation, after manual deployment works.
+
+### 1. Install CLI, select project and billing (you perform these steps)
+Install the [Google Cloud CLI for Windows](https://docs.cloud.google.com/sdk/docs/install).
+Use a personal Google account. Commands below are PowerShell, from the repository.
+Replace all placeholders. Stop on any command failure before proceeding.
+
+```powershell
+gcloud auth login
+$ProjectId = "YOUR_GLOBALLY_UNIQUE_PROJECT_ID"
+$Region = "us-central1"
+$Service = "whcc-small-group"
+$UserEmail = "YOUR_PERSONAL_GOOGLE_EMAIL"
+gcloud projects create $ProjectId --name="WHCC small group"
+# Skip creation if you already have the intended personal project.
+gcloud config set project $ProjectId
+gcloud billing accounts list
+$BillingAccountId = "YOUR_BILLING_ACCOUNT_ID"
+gcloud billing projects link $ProjectId --billing-account=$BillingAccountId
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com secretmanager.googleapis.com sheets.googleapis.com
+```
+Your Google user needs project creation permission (or an existing project), billing
+account User and project Billing Manager to link billing, Service Usage Admin to
+enable APIs, Service Account Admin to create identities/bind their policies, Secret
+Manager Admin to create secrets, and project IAM policy permissions for setup grants.
+These are setup permissions for your user, never the runtime identity. For ongoing
+source deploys use Cloud Run Source Developer, Service Usage Consumer and Service
+Account User on the two identities below. Changing public invocation/IAM also needs
+Cloud Run Admin or an administrator performing that step; do not grant it to runtime.
+
+### 2. Separate runtime and build service accounts
+```powershell
+gcloud iam service-accounts create whcc-runtime --display-name="WHCC runtime"
+gcloud iam service-accounts create whcc-build --display-name="WHCC build"
+$RuntimeEmail = "whcc-runtime@$ProjectId.iam.gserviceaccount.com"
+$BuildEmail = "whcc-build@$ProjectId.iam.gserviceaccount.com"
+gcloud projects add-iam-policy-binding $ProjectId --member="serviceAccount:$BuildEmail" --role="roles/run.builder"
+gcloud projects add-iam-policy-binding $ProjectId --member="user:$UserEmail" --role="roles/run.sourceDeveloper"
+gcloud projects add-iam-policy-binding $ProjectId --member="user:$UserEmail" --role="roles/serviceusage.serviceUsageConsumer"
+gcloud iam service-accounts add-iam-policy-binding $RuntimeEmail --member="user:$UserEmail" --role="roles/iam.serviceAccountUser"
+gcloud iam service-accounts add-iam-policy-binding $BuildEmail --member="user:$UserEmail" --role="roles/iam.serviceAccountUser"
+```
+Runtime needs no project Owner/Editor role, no build role, and no downloaded key.
+Share the intended church spreadsheet with `$RuntimeEmail` as **Editor**, because
+attendance/backend writes require it. Sheets permissions apply to the whole file;
+the code restricts writes to App Backend, not IAM. If that broad sheet permission is
+unacceptable, separate the backend into another spreadsheet in future work.
+Remove Anyone-with-the-link sharing before storing private attendance information.
+Cloud Run ADC discovers the assigned service account and requests Sheets scopes.
+Local development can still use an external `GOOGLE_APPLICATION_CREDENTIALS` file.
+Do not set that variable or upload a service-account JSON on Cloud Run.
+
+### 3. Create three Secret Manager secrets
+Generate local values without displaying them; the script prompts twice for each
+password, writes password hashes and a random signing key to ignored files, and
+refuses to overwrite existing files. Passwords should be distinct and kept privately.
+
+```powershell
+.\.venv\Scripts\python.exe tools/create_deployment_secrets.py
+gcloud secrets create whcc-secret-key --replication-policy=automatic --data-file=private/deployment-secrets/secret-key
+gcloud secrets create whcc-group-password-hash --replication-policy=automatic --data-file=private/deployment-secrets/group-password-hash
+gcloud secrets create whcc-admin-password-hash --replication-policy=automatic --data-file=private/deployment-secrets/admin-password-hash
+foreach ($SecretName in @("whcc-secret-key", "whcc-group-password-hash", "whcc-admin-password-hash")) {
+    gcloud secrets add-iam-policy-binding $SecretName --member="serviceAccount:$RuntimeEmail" --role="roles/secretmanager.secretAccessor"
+}
+```
+Grant Secret Accessor on these individual secrets only. Pin versions (initially `1`)
+in the deployment command. Rotation uses `gcloud secrets versions add SECRET_NAME
+--data-file=PRIVATE_FILE`, then deploy the chosen new version. Rotating a password
+hash invalidates its login sessions; changing SECRET_KEY invalidates all cookies and
+can orphan remembered household identities. Preserve SECRET_KEY across deployments.
+Local files contain sensitive hashes/key material; protect them with your Windows
+account permissions and never paste them into chat or commit them.
+
+### 4. Nonsecret runtime configuration
+Create ignored `cloudrun.env.yaml` locally. This fictional table-layout example is a
+starting point; set the real ID/range/layout/field mapping privately. For the existing
+two-row calendar use the earlier calendar instructions, explicit school year,
+confirmed `18:00` start time, and leader-confirmed canceled-date overrides.
+Quote all YAML values to make them strings. Omit GOOGLE_APPLICATION_CREDENTIALS.
+
+```yaml
+APP_ENV: "production"
+DATA_SOURCE: "google"
+GOOGLE_SHEET_ID: "YOUR_SPREADSHEET_ID"
+GOOGLE_SHEET_RANGE: "'Schedule'!A1:J500"
+SHEET_LAYOUT: "table"
+FIELD_MAPPING_JSON: '{}'
+SCHEDULE_EDITING: "true"
+BACKEND_SHEET_ENABLED: "true"
+BACKEND_SHEET_TITLE: "App Backend"
+CACHE_SECONDS: "60"
+COOKIE_SECURE: "true"
+TRUST_PROXY: "true"
+```
+The App Backend must already exist. For a fresh sheet, use the documented local
+`init-sheet-backend` CLI with private local credentials; it refuses to replace an
+existing tab. No creation/migration of the real backend was performed in this task.
+Back up its full contents and stop all older writers before the first deployment.
+
+### 5. Review upload, then manually deploy
+The `.gcloudignore` and `.dockerignore` allow only runtime source, requirements,
+Dockerfile and fictional sample CSV. Dockerfile also uses explicit COPY paths.
+Review the file list: no private/, .env, databases, keys, tests or archives may appear.
+
+```powershell
+gcloud meta list-files-for-upload
+gcloud run deploy $Service --source . --region=$Region --service-account=$RuntimeEmail --build-service-account="projects/$ProjectId/serviceAccounts/$BuildEmail" --env-vars-file=cloudrun.env.yaml --set-secrets="SECRET_KEY=whcc-secret-key:1,GROUP_ACCESS_PASSWORD_HASH=whcc-group-password-hash:1,ADMIN_PASSWORD_HASH=whcc-admin-password-hash:1" --min=0 --max=1 --concurrency=4 --cpu=1 --memory=512Mi --cpu-throttling --timeout=120 --port=8080 --allow-unauthenticated
+$ServiceUrl = gcloud run services describe $Service --region=$Region --format="value(status.url)"
+Invoke-RestMethod "$ServiceUrl/health"
+gcloud run services describe $Service --region=$Region
+```
+`--allow-unauthenticated` exposes the HTTPS entry point to ordinary browsers; the
+Flask group password protects schedule/RSVP/admin routes. Health and static assets
+are public and contain no group data. Organization policy may prohibit public
+invocation; ask an administrator rather than weakening policy. Cloud Build can
+prompt to create its Artifact Registry repository. Approve only when you are ready
+for the first deployment and potential charges.
+
+One worker, four Gunicorn threads and concurrency 4 keep slow API calls manageable;
+SQLite/backend writes share a process lock. Service-level `--min=0 --max=1` applies
+across revisions. Cloud Run can briefly exceed its max during replacements, so the
+append log also rejects stale independent writers. No persistent disk is required.
+Cloud Run terminates TLS; narrow ProxyFix trusts only the final protocol header,
+not forwarded IP/host/port. Enable TRUST_PROXY only behind Cloud Run's managed
+proxy, never for a directly exposed Gunicorn server. Production forces Secure,
+HttpOnly, SameSite=Lax cookies and requires both hashes plus a stable signing key.
+
+### 6. Post-deployment verification and recovery
+- Confirm `/health` returns only `{"status":"ok"}`, without login or Sheets calls.
+- In a fresh/private browser confirm /, /past and /admin redirect to group login;
+  unauthenticated POST cannot change attendance. Wrong passwords/CSRF fail.
+- Sign in with the group password; verify actual schedule, Central times and refresh.
+  Admin still requires its separate password. Sign out and verify access closes.
+- Create a designated test household/RSVP, deselect one person, then check backend
+  update rows and totals in the app. Clear the test response afterward.
+- Make a reversible admin note edit and restore it. Change a source field separately
+  and verify merge/conflict handling. Never manually edit the managed backend.
+- Redeploy the same source/config/secrets to force a fresh revision; using the same
+  browser, confirm household profile, RSVP and override restore. Verify actual new
+  revision traffic in Cloud Run. Scale-to-zero/wake can then be checked after idle.
+- Simulate missing sheet access only on a separate test sheet: stale data remains
+  readable, writes fail clearly, cold unavailable state is useful, recovery works.
+- Inspect Cloud Run logs for sanitized failure classes, never passwords/credentials.
+  Check Secure cookies and HTTPS redirects in browser developer tools.
+
+A fresh runtime needs the backend and source permissions plus Secret Manager access.
+Local storage loss is safe for **confirmed** writes. Failed/unknown writes must be
+reviewed after reload. If backend content is corrupt, stop writers, preserve a copy,
+restore a verified full-tab backup with the same signing key, and verify before
+resuming. Do not roll back to a pre-append-log app version against this backend.
+
+### 7. Cost controls
+Use request-based billing (`--cpu-throttling`), min 0, service max 1, CPU 1 and 512 MiB.
+No always-on worker, VPC connector or database. A few dozen users may fit applicable
+free allowances, shared across the billing account; **$0 is not guaranteed**.
+Builds, stored container images/build artifacts, Secret Manager, logs and network
+traffic can cost separately. Keep deployments infrequent initially; monitor and
+remove unneeded old images/build artifacts deliberately after preserving rollback.
+In Billing > Budgets & alerts create a project-scoped **alerts-only** monthly budget
+of $5, with actual-spend alerts at 20%, 50%, 90% and 100%, plus forecast 100%.
+Confirm email delivery. An alerts-only budget does not cap or stop spending; max
+instances is also not a hard monetary cap. Review Billing after the first deploy
+and weekly initially. Delete the service deliberately if you decide to stop hosting;
+images, secrets and build storage may continue incurring costs until separately removed.
+
+References: [source deployment](https://docs.cloud.google.com/run/docs/deploying-source-code),
+[custom build identity](https://docs.cloud.google.com/run/docs/configuring/services/build-service-account),
+[service identity](https://docs.cloud.google.com/run/docs/securing/service-identity),
+[secrets](https://docs.cloud.google.com/run/docs/configuring/services/secrets),
+[maximum instances](https://docs.cloud.google.com/run/docs/configuring/max-instances),
+[pricing](https://cloud.google.com/run/pricing),
+[budget alerts](https://docs.cloud.google.com/billing/docs/how-to/budgets).
+
+### Production configuration matrix
+All variables read by the app are listed below; defaults apply when omitted.
+Sheet identifiers/mappings are not authentication secrets but belong only in private
+local configuration for this public repository.
+
+| Variable | Purpose | Secret? | Local source | Cloud Run source |
+|---|---|---|---|---|
+| APP_ENV | development or production; production validates security/durability | No | .env, development | YAML, production |
+| SECRET_KEY | Stable signed-cookie key, 32+ characters | Yes | .env or private/session.key | Secret Manager |
+| GROUP_ACCESS_PASSWORD_HASH | Shared group gate, optional locally | Yes | .env | Secret Manager, mandatory |
+| ADMIN_PASSWORD_HASH | Separate admin gate | Yes | .env or password file | Secret Manager, mandatory |
+| ADMIN_PASSWORD_FILE | Local fallback hash path | Yes contents | private/admin-password.hash | Unused with hash configured |
+| GOOGLE_APPLICATION_CREDENTIALS | Local external key path | Yes contents | Outside repo | Omit; runtime ADC |
+| DATA_SOURCE | csv or google | No | csv by default | YAML, google |
+| GOOGLE_SHEET_ID | Spreadsheet identifier | Private config | .env.google | YAML |
+| GOOGLE_SHEET_RANGE | Original source range | Private config | .env.google | YAML |
+| SHEET_LAYOUT | table or calendar | No | .env | YAML |
+| FIELD_MAPPING_JSON | Internal field/header mapping | Private config | .env | YAML |
+| CSV_PATH | Fictional demo input | No | data/sample.csv | Unused in Google mode |
+| CACHE_SECONDS | Last-good refresh interval, 1..3600 | No | 60 | YAML, 60 |
+| REQUIRED_ASSIGNMENTS | Fields marked when blank | No | discussion_leader,host,food,childcare | YAML optional |
+| DATE_FORMAT / TIME_FORMAT | Table parsing formats | No | %Y-%m-%d / %H:%M | YAML optional |
+| CALENDAR_START_YEAR / CALENDAR_START_MONTH | School-year rollover | No | Explicit year / 9 | YAML for calendar |
+| CALENDAR_START_TIME | All calendar gatherings start time | No | Confirmed HH:MM | YAML for calendar |
+| CALENDAR_DATE_COLUMN / CALENDAR_EVENT_COLUMN | Calendar columns | No | A / D | YAML optional |
+| CALENDAR_END_MARKER | Stop before descriptive rows | No | Roles | YAML optional |
+| CALENDAR_TOPIC_LABELS_JSON | Continuation labels | No | ["Sermon Series"] | YAML optional |
+| CALENDAR_CANCELED_DATES | Confirmed off-date overrides | Private config | Comma-separated ISO dates | YAML optional |
+| SCHEDULE_EDITING | Effective schedule/admin enabled | No | true | YAML, true |
+| BACKEND_SHEET_ENABLED | Durable Google backend publication | No | false by default | YAML, true |
+| BACKEND_SHEET_TITLE | Managed tab name | Private config | App Backend | YAML |
+| RSVP_DATABASE | SQLite runtime/cache path | Private contents | private/attendance.sqlite3 | Default /tmp/whcc/attendance.sqlite3 |
+| RSVP_SECRET_FILE | Development generated signing key path | Yes contents | private/session.key | Unused; SECRET_KEY required |
+| RSVP_COOKIE_NAME | Browser cookie name | No | whcc_household | YAML optional |
+| COOKIE_SECURE | HTTPS cookie flag | No | false for local HTTP | Forced true in production |
+| TRUST_PROXY | Trust only managed proxy's scheme header | No | false | YAML, true for Cloud Run |
+| PORT | Gunicorn binding | No | Docker 8080 | Cloud Run injected |
+
+No GOOGLE_SERVICE_ACCOUNT_JSON mechanism existed in this checkout; none was added.
+Authentication is lazy, so startup and /health require no Sheets request.
+
+### Optional container verification at home
+Docker was unavailable on the preparation workstation. With Docker Desktop using
+Linux containers, this fictional configuration exercises startup/health without a
+real credential or any Sheets request. Generate an ignored `.env.container-test`
+with fictional long SECRET_KEY, password hashes (not plaintext), APP_ENV=production,
+DATA_SOURCE=google, GOOGLE_SHEET_ID=fictional-sheet-id, SCHEDULE_EDITING=true and
+BACKEND_SHEET_ENABLED=true. Omit a credential path. Then:
+
+```powershell
+docker build -t whcc-small-group .
+docker run --rm -p 8080:8080 --env-file .env.container-test whcc-small-group
+# In another terminal:
+Invoke-RestMethod http://localhost:8080/health
+```
+The schedule is intentionally unavailable with fictional Google configuration.
+Do not pass real credentials for this build/health check.

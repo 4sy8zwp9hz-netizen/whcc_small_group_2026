@@ -18,6 +18,9 @@ def create_app(test_config=None, source=None, now=None):
     load_dotenv(ROOT / ".env", override=False)
     app = Flask(__name__)
     app.config.from_mapping(
+        APP_ENV=os.getenv("APP_ENV", "development"),
+        GROUP_ACCESS_PASSWORD_HASH=os.getenv("GROUP_ACCESS_PASSWORD_HASH", ""),
+        TRUST_PROXY=os.getenv("TRUST_PROXY", "false").lower() == "true",
         SCHEDULE_EDITING=os.getenv("SCHEDULE_EDITING", "true").lower() == "true",
         BACKEND_SHEET_ENABLED=os.getenv("BACKEND_SHEET_ENABLED", "false").lower() == "true",
         BACKEND_SHEET_TITLE=os.getenv("BACKEND_SHEET_TITLE", "App Backend"),
@@ -57,6 +60,36 @@ def create_app(test_config=None, source=None, now=None):
     )
     if test_config:
         app.config.update(test_config)
+    if app.config["APP_ENV"] not in {"development", "production"}:
+        raise ValueError("APP_ENV must be development or production.")
+    production = app.config["APP_ENV"] == "production"
+    app.config["STRICT_DURABILITY"] = production
+    if production:
+        import re
+        from werkzeug.security import check_password_hash
+        for key in ("GROUP_ACCESS_PASSWORD_HASH", "ADMIN_PASSWORD_HASH"):
+            value = app.config[key]
+            if not value or not value.startswith(("scrypt:", "pbkdf2:")):
+                raise ValueError(f"Production requires a password hash for {key}.")
+            if not re.fullmatch(r"(?:scrypt|pbkdf2):[^$]+\$[^$]{8,}\$[a-f0-9]{64,128}", value):
+                raise ValueError(f"Production requires a valid password hash for {key}.")
+            try:
+                check_password_hash(value, "configuration-validation")
+            except ValueError:
+                raise ValueError(f"Invalid password hash method for {key}.") from None
+        if not app.secret_key or len(app.secret_key) < 32:
+            raise ValueError("Production requires a stable SECRET_KEY of at least 32 characters.")
+        if not (app.config["DATA_SOURCE"] == "google" and app.config["SCHEDULE_EDITING"]
+                and app.config["BACKEND_SHEET_ENABLED"] and app.config["GOOGLE_SHEET_ID"]):
+            raise ValueError("Production requires the Google source and durable App Backend.")
+        app.config["SESSION_COOKIE_SECURE"] = True
+        if not test_config or "RSVP_DATABASE" not in test_config:
+            app.config["RSVP_DATABASE"] = "/tmp/whcc/attendance.sqlite3"
+    if app.config["TRUST_PROXY"]:
+        if not production:
+            raise ValueError("TRUST_PROXY is restricted to the Cloud Run production configuration.")
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=0, x_proto=1, x_host=0, x_port=0, x_prefix=0)
     if app.testing and (not test_config or "RSVP_DATABASE" not in test_config):
         app.config["RSVP_DATABASE"] = ":memory:"
     if app.testing and (not test_config or "SCHEDULE_EDITING" not in test_config):
@@ -135,6 +168,13 @@ def create_app(test_config=None, source=None, now=None):
         backend = Backend(app, cache, attendance_service, publisher)
         app.extensions["backend"] = backend
         install_admin(app, ROOT, backend, attendance_service)
+
+    from .group_access import install_group_access
+    install_group_access(app, attendance_service)
+
+    @app.get("/health")
+    def health():
+        return {"status": "ok"}
 
     @app.after_request
     def response_headers(response):

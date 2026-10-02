@@ -27,3 +27,9 @@ Thumbs.db
 *.sqlite3-*
 *.db
 *.db-*
+
+# Default-deny JSON credential files; explicitly review future public JSON assets.
+*.json
+cloudrun.env.yaml
+.vscode/
+.idea/

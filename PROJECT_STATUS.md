@@ -1,6 +1,6 @@
 # Project status
 
-Updated: 2026-10-01
+Updated: 2026-10-02
 
 ## Purpose and boundaries
 Original personal project for the owner's WHCC small group, co-led with his wife
@@ -17,7 +17,7 @@ No paid services or public app deployment are authorized.
 - America/Chicago times with DST validation.
 - Process-local 60-second cache, safe stale fallback, last-successful timestamp,
   useful no-data error, and atomic validation before replacing cached data.
-- Git exclusions, .env.example, Windows/Wi-Fi instructions, future Render command.
+- Git exclusions, .env.example, Windows/Wi-Fi instructions, future production command.
 - 92 automated tests passed on Python 3.12.14. Python compilation passed.
 - Added an optional school-year calendar reader with two-row assignments, header
   mapping, merged event titles, off weeks, optional notes, and footer exclusion.
@@ -54,7 +54,8 @@ No paid services or public app deployment are authorized.
   and desktop (1265-pixel content width), with no horizontal overflow. The top
   card starts about 63 pixels from the top on phone. Expanded past assignments
   also fit the phone width. Physical phone testing remains pending.
-- Production still needs website access decisions, durable storage, HTTPS cookie
+- Earlier production gaps (now addressed by Cloud Run readiness below) included
+  website access decisions, durable storage, HTTPS cookie
   settings, and a stable signing secret. No public app deployment was performed.
 
 ## Admin and Google backend update
@@ -134,5 +135,105 @@ No website has been deployed. Public source code is not permission to publish re
    group data online. A private sheet does not make the website private.
 5. Test on a physical phone on trusted Wi-Fi.
 6. Decide household recovery, roster editing, and leader correction before wider use.
-7. Once explicitly authorized, plan Render secrets, durable attendance storage,
-   access enforcement, and deployment.
+7. Perform the documented Cloud Run manual setup only after explicit deployment
+   authorization; container and real deployment verification remain pending.
+
+
+## Cloud Run readiness completed (2026-10-02)
+The inspected checkout/remote had no separate earlier production-readiness commit;
+this work preserves the existing Flask/calendar/admin/attendance implementation and
+adds the missing deployment and access features. No Google credentials were used,
+no live sheet was read/changed, and no cloud resources, billing or deployment were
+created during this task.
+
+### Completed
+- Official Python 3.12 slim Dockerfile, non-root runtime, explicit COPY paths,
+  source-upload/image allowlists and separate development test requirements.
+- PORT-aware Gunicorn config: one worker, four threads, timeout 120.
+- Lazy server ADC on Cloud Run; explicit external local key remains supported.
+- Production requires stable SECRET_KEY, separate group/admin hashes and durable
+  Google backend; cookies forced Secure. Group login/logout/CSRF/throttling protects
+  member/private routes and admin remains independently authenticated.
+- Public minimal /health has no cookie, private fields or Google calls.
+- Opt-in narrowly scoped proxy handling (scheme only) for Cloud Run TLS termination.
+- Production restores Sheets before writing, rolls back unconfirmed cache changes,
+  and never claims queued ephemeral writes are durable. Development still queues.
+- Same-tab append-only optimistic update log tolerates replacement overlap without
+  overwriting accepted history. Duplicate IDs are idempotent; stale writers rejected.
+- Durable household profiles persist even when their last RSVP is cleared.
+- Exact manual setup/deploy, least-privilege IAM, secrets/config matrix, cost controls,
+  upload review, verification and recovery guide in README.
+
+### Architecture
+Browser HTTPS -> Cloud Run -> Flask/Gunicorn -> Sheets API -> original calendar
+(read-only) and App Backend (durable initial snapshot plus append-only updates).
+SQLite under /tmp is a runtime cache in production, rebuilt from the App Backend.
+No SQL/Redis/Firebase or persistent disk, no CI/CD and no unattended sync process.
+
+### Remaining manual steps
+1. Install gcloud/Docker Desktop if desired; verify Docker build and health locally.
+2. Choose/create personal project, attach billing, enable Run/Build/Artifact Registry/
+   Secret Manager/Sheets APIs, and configure an alerts-only budget.
+3. Create whcc-runtime and whcc-build identities; grant build run.builder and grant
+   runtime Secret Accessor only on the three secrets. Your user needs setup IAM and
+   ongoing source deploy/actAs permissions; see README's exact commands.
+4. Restrict sheet sharing, share as Editor with runtime email, back up the full App
+   Backend and stop all older/full-tab writers. No live migration was done here.
+5. Generate/store secrets, create private cloudrun.env.yaml with actual confirmed
+   source layout/year/time/mappings. Review gcloud upload file list.
+6. Deploy manually only when authorized, then execute the post-deployment checklist.
+
+### Secrets
+Create whcc-secret-key -> SECRET_KEY, whcc-group-password-hash ->
+GROUP_ACCESS_PASSWORD_HASH, whcc-admin-password-hash -> ADMIN_PASSWORD_HASH.
+Use pinned Secret Manager versions (initially 1). Keep the signing key unchanged
+across revisions. tools/create_deployment_secrets.py creates ignored local files
+interactively, never logs their values and makes no cloud requests.
+
+### Service Account
+whcc-runtime@YOUR_PROJECT_ID.iam.gserviceaccount.com is the runtime identity.
+It has no Google Cloud Owner/Editor role, no downloaded key, and no build role.
+Share the intended spreadsheet as Editor with that email; Sheets grants file-level
+access, while the application restricts writes to the configured backend tab.
+whcc-build is separate and has run.builder. Do not reuse old local keys in Cloud Run.
+
+### Deployment
+Use README's exact PowerShell `gcloud run deploy --source .` command with runtime
+and build accounts, private env YAML, pinned secrets, --min=0 --max=1 --concurrency=4
+--cpu=1 --memory=512Mi --cpu-throttling --timeout=120 --port=8080. Browser invocation
+is public at Cloud Run but all group information is password-gated in Flask.
+The Dockerfile is used by source deployment. The prior hosting target has been removed.
+
+### Verification
+Current preparation: 112 fictional-only tests passed, including filesystem deletion,
+fresh-instance restore with the same cookie, overrides/RSVP, strict failed writes,
+ADC selection, public health, production config rejection, group/CSRF/throttling,
+secure cookies/proxy and stale writer/lost append acknowledgment handling.
+Docker and gcloud are unavailable on this workstation; container build/start and
+real Cloud Run ADC/HTTPS checks remain pending. Prior schedule/admin phone/desktop
+browser checks predate this change; new group login visual inspection remains pending.
+After deployment verify /health, group/admin login separation, cookie/CSRF behavior,
+RSVP member opt-outs, source merge/conflicts, backend updates, sanitized logs, and
+redeploy with identical signing key to force empty-filesystem recovery.
+
+### Recovery and limitations
+Confirmed writes survive scale-to-zero and replacement because the full state lives
+in Sheets. If the original calendar fails, restored backend data is shown stale;
+RSVP closes. If no backend/cache is readable, return a useful unavailable state.
+Unknown network acknowledgment may have persisted: reload before retrying. Cookies
+are browser identities, not individual authentication. Throttling is process-local
+and resets on replacement; shared passwords are a proof-of-concept access gate.
+Do not sort/edit/delete managed rows or run a pre-log app version against the log.
+Initial visible backend rows are a baseline; latest effective values/counts appear
+in the app, while appended updates retain history in the managed column.
+The log grows and updates have a 49,000-character payload limit. Future maintenance
+needs offline verified-backup compaction, household recovery and roster editing.
+A production runtime must use its own empty single-source cache; do not point it at
+an unrelated shared database. Backend replacement imports only that app's data.
+
+### Cost
+Request-based billing, min 0, max 1, CPU 1 and 512 MiB target near-zero use for a few
+dozen users. No guaranteed $0: build/image storage, secrets, logs/egress and shared
+free allowances matter. Set $5 alerts-only project budget at 20/50/90/100% and
+forecast 100%, verify notifications and inspect billing after deployment. Alerts
+and instance limits are not hard spending caps. README gives cleanup considerations.

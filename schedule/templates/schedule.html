@@ -75,6 +75,7 @@
     <a href="{{ '/past' if past else '/' }}">Refresh schedule</a>
   </div>
   <p id="attendance-feedback" class="sr-only" role="status" aria-live="polite"></p>
+  {% if config.GROUP_ACCESS_PASSWORD_HASH %}<form method="post" action="{{ url_for('group_logout') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit">Sign out of group</button></form>{% endif %}
   <footer>All times are America/Chicago (Central Time).<br>{{ 'Fictional CSV schedule.' if sample else 'Schedule from Google Sheets.' }} Attendance is saved separately.
   {% if admin_enabled %}<br><a href="{{ url_for('admin_index') }}">Leader admin</a>{% endif %}</footer>
 </main>

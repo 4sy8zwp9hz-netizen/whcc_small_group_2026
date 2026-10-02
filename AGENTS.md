@@ -7,7 +7,8 @@ Never copy company code, configurations, credentials, private data, or chat arch
 The owner authorized admin schedule editing, a new App Backend tab, and attendance
 updates in that tab. The original calendar adapter remains read-only. Merge its
 changes into the effective schedule without overwriting app edits; require explicit
-admin resolution for conflicts. SQLite durably holds local edits and pending sync.
+admin resolution for conflicts. Development SQLite holds local edits and pending sync. Production SQLite is ephemeral;
+confirmed App Backend persistence is required before acknowledging writes.
 
 Use Flask, server-rendered Jinja templates, and plain responsive CSS. No frontend
 build system. A shared-password admin area is authorized. No member accounts, reminders, payments,
@@ -25,9 +26,11 @@ group information online. A private sheet does not make the website private.
 - Keep databases, password hashes, and session secrets under ignored private/ paths.
 - Write only the configured backend tab; never edit the original calendar. Write
   literal cell values, never interpret submitted text as spreadsheet formulas.
-- One running server owns the backend tab. Detect foreign changes and refuse to
-  overwrite them; Google Sheets offers no compare-and-swap guarantee.
-- Preserve revisions, source baselines, stable meeting IDs, and queued local writes.
+- Use one Gunicorn worker and Cloud Run service min 0 / max 1. Replacement overlap
+  is possible: append optimistic updates, replay only matching predecessor digests,
+  never rewrite accepted history. Stop older full-tab writers before migration.
+- Preserve revisions, source baselines and stable meeting IDs. Queue local writes
+  only in development; production restores Sheets state and rolls back failed writes.
 - Admin edits require authentication, expiry, CSRF, validation, and a current revision.
 - Keep template autoescaping enabled and show safe errors rather than raw exceptions.
 - Required assignments are configurable; optional blanks are not errors.
@@ -64,3 +67,17 @@ The school-year rollover and start time must be explicit. Keep source dates inta
 only apply leader-confirmed off-date overrides. The requested backend tab may be updated; the original calendar must remain intact. Any local .env.google and private/ notes are ignored and do not transfer by
 clone. Live Google API reads were verified on the original workstation. A fresh
 clone still needs the user's server-side credentials and private configuration.
+
+## Cloud Run readiness
+No deployment/cloud resource creation is authorized by readiness work. Runtime uses
+ADC with the assigned service account; do not upload a JSON private key. Keep the
+stable SECRET_KEY and separate group/admin hashes in Secret Manager. /health stays
+public, minimal, and free of Google calls. Protect every private member/admin route
+with the group gate and admin routes independently. ProxyFix trusts only the final
+scheme header when explicitly configured behind Cloud Run. No additional workers,
+databases, or background infrastructure without deliberate architecture review.
+Read the Cloud Run README checklist before any future deployment. Test lost local
+storage with the same cookie, strict failed writes, stale overlapping writers,
+credential mocks and group/CSRF gates. Never run pre-log app versions on a backend
+that contains update events. Container/source-upload ignore files are allowlists;
+review them when adding runtime files. Install requirements-dev.txt for validation.
