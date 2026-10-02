@@ -55,7 +55,9 @@ content for horizontal overflow; keep controls keyboard-accessible.
 Tests cover chronology, next gathering, cancellation, blanks, cache TTL, stale/error
 states, mapping, DST, escaping, and the read-only Google adapter contract. Attendance
 tests cover cookies, individual selections, duplicate responses, CSRF, persistence,
-and rejected writes for stale/canceled/past/ambiguous meetings. Exercise real browser
+and rejected writes for unverifiable backend/canceled/past/ambiguous meetings.
+A source-calendar outage alone must not close production attendance when the backend
+was verified; every submission still rechecks the backend and confirms persistence. Exercise real browser
 submissions as well: server-only tests cannot validate JavaScript form behavior.
 Admin/backend tests cover auth, conflict resolution, stale forms, durable pending
 writes, lost acknowledgments, restoration, and scoped Google writes.
@@ -101,3 +103,14 @@ The original review-fix request authorized local changes/testing only. The owner
 subsequently authorized staging, commit and normal push of the combined fixes and
 remembered group login to the existing personal main branch. No live Sheets access,
 cloud resources, deployment or real secret generation/rotation is authorized.
+
+## Explicit backend rebuild maintenance
+The owner authorized a backed-up admin repair when visible managed cells are damaged.
+Normal write() remains disabled. Only /admin/recovery/rebuild may compact validated
+hidden state after group/admin auth, CSRF, preview fingerprint, typed confirmation,
+and stopped-writer confirmation. Verify a literal A:Q backup before replacement;
+recheck unchanged data and verify the result. Never retry an unknown replacement
+blindly. Preserve meeting IDs, profiles/member IDs and effective historical RSVPs.
+Visible-only manual edits are archived, not imported; corrupt stored data refuses
+rebuild. Original calendar stays read-only. This is not a CAS or concurrent repair.
+Do not access live Sheets, publish or deploy without explicit authorization.

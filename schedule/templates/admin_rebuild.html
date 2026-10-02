@@ -1,0 +1,24 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<h2>Rebuild the app backend</h2>
+<p>This explicit repair works even when normal backend validation blocks the app. It uses validated stored app data, not visible-only manual edits. The original calendar is never changed.</p>
+{% if error %}<p class="notice" role="alert">{{ error }}</p>{% endif %}
+{% if recovered %}<p class="notice" role="status">Backend rebuilt and verified. The previous managed data is in backup tab {{ recovered }}. Return to admin home to check calendar refresh and synchronization.</p>{% endif %}
+{% if plan %}
+<p>The rebuilt snapshot preserves {{ plan.meetings }} meetings, {{ plan.households }} household profiles and {{ plan.responses }} attendance responses, including historical responses and existing meeting links.</p>
+<p>{{ plan.events }} update rows will be compacted into that snapshot. {{ plan.rejected }} stale updates were not accepted. The original update history remains in the backup.</p>
+{% if plan.rows %}<p>Unidentified rows without stored data will be archived only: {{ plan.rows|join(', ') }}.</p>{% endif %}
+<p>A verified literal backup of managed A:Q cells is created first. Rebuilding replaces A:Q with the recovered snapshot and clears old update rows. Other columns are untouched and are not backed up here. Keep a complete spreadsheet backup too.</p>
+<p>Visible-only manual changes will not become app data. Edit the schedule through the admin page after repair. Damaged stored records cannot be recovered by this tool.</p>
+<form method="post" class="admin-form">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<input type="hidden" name="token" value="{{ plan.token }}">
+<label class="remember-device"><input type="checkbox" name="writers_stopped" value="yes" required> All other app writers and manual sheet edits are stopped.</label>
+<p>Sheets has no transactional compare-and-swap. Use only one current runtime during repair; do not submit attendance or edits until it finishes.</p>
+<label for="confirm-rebuild">Type REBUILD to confirm the replacement described above</label>
+<input id="confirm-rebuild" name="confirm_rebuild" required pattern="REBUILD" autocomplete="off">
+<button type="submit">Back up and rebuild backend</button>
+</form>
+{% endif %}
+<p><a href="{{ url_for('admin_index') }}">Return to admin home</a></p>
+{% endblock %}

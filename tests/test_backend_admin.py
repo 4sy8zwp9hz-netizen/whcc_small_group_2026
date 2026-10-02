@@ -186,7 +186,7 @@ def test_source_failure_keeps_data_and_blocks_admin_write():
     result = client.post("/admin/meetings/" + record["id"], data=form(record, csrf, host="Changed"))
     assert result.status_code == 409
     assert backend.records()[0] == record
-    assert "last successful schedule" in client.get("/").text
+    assert "saved schedule" in client.get("/").text
 
 
 def test_removed_calendar_date_requires_explicit_keep_or_cancel():
@@ -332,7 +332,7 @@ def test_pending_schedule_survives_restart_with_stale_source(local_path):
     second, _, restored = make(source, RSVP_DATABASE=database)
     response = second.test_client().get("/")
     assert response.status_code == 200
-    assert "Persisted app edit" in response.text and "last successful schedule" in response.text
+    assert "Persisted app edit" in response.text and "saved schedule" in response.text
     restored.store.connection.close()
 
 

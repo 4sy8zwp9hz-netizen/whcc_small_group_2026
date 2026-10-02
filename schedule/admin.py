@@ -87,13 +87,14 @@ def install_admin(app, root, backend, attendance):
         if record is None:
             abort(404)
         error, code = "", 200
+        editing_available = not snapshot.stale or (backend.strict and backend.attendance_available)
         values = record["values"].copy()
         if request.method == "POST":
             values = {f: request.form.get(f, "").strip() for f in EDIT_FIELDS if f != "special_event"}
             values["special_event"] = request.form.get("special_event") == "true"
             try:
-                if snapshot.stale:
-                    raise DataError("The original calendar could not refresh. Try again before editing.")
+                if not editing_available:
+                    raise DataError("The saved backend could not be verified. Reload before editing.")
                 backend.edit(key, request.form.get("revision", ""), values,
                              {field: request.form.get("resolve_" + field) for field in record["conflicts"]})
                 return redirect(url_for("admin_index"), code=303)
@@ -102,7 +103,7 @@ def install_admin(app, root, backend, attendance):
             except ValueError:
                 error, code = "Check the date and time, then try again.", 400
         return page("admin_edit.html", record=record, values=values, fields=EDIT_FIELDS,
-                    error=error, stale=snapshot.stale,
+                    error=error, stale=snapshot.stale, editing_available=editing_available,
                     version_conflict=(request.method == "POST" and
                                       request.form.get("revision") != str(record["revision"]))), code
 
@@ -144,6 +145,33 @@ def install_admin(app, root, backend, attendance):
             error = str(exc) if isinstance(exc, DataError) else "Recovery could not be confirmed. Check the retained backup before retrying."
             code = 409 if isinstance(exc, DataError) else 503
         return page("admin_recovery.html", plan=plan, error=error, recovered=recovered), code
+
+    @app.route("/admin/recovery/rebuild", methods=["GET", "POST"])
+    def admin_rebuild():
+        if not signed_in():
+            return redirect(url_for("admin_login"))
+        if request.method == "POST" and not attendance.csrf_valid():
+            abort(400)
+        from .recovery import BackendRecovery
+        plan, error, recovered, code = None, "", None, 200
+        try:
+            if not backend.publisher or not hasattr(backend.publisher, "decode_table"):
+                raise DataError("Google backend rebuild is unavailable in local demo mode.")
+            recovery = BackendRecovery(backend.publisher)
+            with backend.store.lock:
+                if request.method == "POST":
+                    if request.form.get("writers_stopped") != "yes" or request.form.get("confirm_rebuild") != "REBUILD":
+                        raise DataError("Confirm stopped writers and type REBUILD before continuing.")
+                    recovered = recovery.rebuild(request.form.get("token", ""))
+                    backend.sync_error = ""
+                plan = recovery.rebuild_preview()
+            if recovered:
+                backend.invalidate()
+                backend.cache.get()
+        except Exception as exc:
+            error = str(exc) if isinstance(exc, DataError) else "Rebuild could not be confirmed. Check the retained backup before retrying."
+            code = 409 if isinstance(exc, DataError) else 503
+        return page("admin_rebuild.html", plan=plan, error=error, recovered=recovered), code
 
     @app.cli.command("set-admin-password")
     @click.password_option(confirmation_prompt=True)

@@ -39,7 +39,7 @@
     <p class="rsvp-error" role="alert"></p>
   </form>
   {% elif not meeting.canceled %}
-  <p class="rsvp-hint">Attendance is closed for past meetings, or unavailable while this schedule needs confirmation.</p>
+  <p class="rsvp-hint">{{ attendance_unavailable_reason(meeting) }}</p>
   {% endif %}
   <details class="attendance-summary">
     <summary>{{ summary.people }} {{ 'person' if summary.people == 1 else 'people' }} going <span>· {{ summary.going|length }} {{ 'household' if summary.going|length == 1 else 'households' }}</span></summary>

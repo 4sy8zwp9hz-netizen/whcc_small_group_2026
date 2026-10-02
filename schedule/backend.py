@@ -74,6 +74,7 @@ class Backend:
         self.retry_at = 0
         self.sync_error = ""
         self.refresh_error = ""
+        self.attendance_available = False
         self.scope = hashlib.sha256(attendance.namespace.encode()).hexdigest()
         with self.store.lock, self.store.connection:
             self.store.connection.executescript("""
@@ -127,6 +128,7 @@ class Backend:
             (self.scope, record["id"], encode(record)))
 
     def read(self):
+        self.attendance_available = False
         try:
             result = self.refresh_schedule()
             self.refresh_error = ""
@@ -256,10 +258,12 @@ class Backend:
         self.restore(remote)
 
     def refresh_remote(self):
+        self.attendance_available = False
         remote = self.publisher.read()
         if remote is None:
             raise DataError("Create the App Backend tab before starting production.")
         self.restore(remote, replace=True)
+        self.attendance_available = True
         return remote
 
     def restore(self, remote, replace=False):
@@ -336,4 +340,4 @@ class Backend:
             pending = bool(self.publisher and digest(self.export()) != self.meta("published_hash"))
             return {"enabled": bool(self.publisher), "pending": pending,
                     "error": self.sync_error, "refresh_error": self.refresh_error,
-                    "strict": self.strict, "last_sync": self.meta("last_sync")}
+                    "strict": self.strict, "attendance_available": self.strict and self.attendance_available, "last_sync": self.meta("last_sync")}

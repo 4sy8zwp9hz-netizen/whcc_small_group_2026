@@ -400,3 +400,86 @@ Cloud Shell and a running Cloud Run website; these were not independently verifi
 here. This new recovery code has not been container-tested or deployed. Review and
 publish it, then perform an explicitly authorized rollout before it appears on the
 running website. Never deploy or repair the live backend without that authorization.
+
+## Explicit backed-up backend rebuild (local, 2026-10-02)
+The owner requested repair despite backend validation errors and supplied pasted
+backup/current managed cells. Inspected attachments offline only; no private data
+was copied into project files. Both supplied backup copies were identical. Current
+pasted hidden state validates: 39 baseline records and three valid update rows
+replay successfully. The paste omits a hidden column on baseline rows, so it is not
+proof of actual live alignment. No live API inspection or root-cause claim is made.
+
+Added /admin/recovery/rebuild as explicit authenticated maintenance. Preview uses
+validated hidden baseline/events despite damaged visible projections, preserves
+meeting IDs/links, profiles/member IDs and effective historical attendance, and
+reports archived unidentified rows. Typed REBUILD plus stopped-writer confirmation,
+CSRF and group/admin gates are required. Verified literal A:Q backup precedes a
+fresh fingerprint check and a single A:Q snapshot replacement. Events are compacted
+into effective state; original history stays in the backup. Visible-only manual
+changes are not imported. Corrupt hidden records, invalid events/headers and missing
+state on identified rows still refuse. Unknown replacement acknowledgement is
+verified without blind retry. Original calendar and extra columns remain untouched.
+Normal write() stays disabled. Normal append searches only the identity column A
+to avoid sparse logical-table column shifts; 17 values still write A:Q. Google API
+append placement has not been verified live; it remains a deployment check.
+
+Validation: 186 tests passed (14 new rebuild cases), compilation and whitespace
+checks passed. Tests cover damaged projections, duplicate/stale events, historical
+RSVP/clear/profile preservation, stable links, cold SQLite restore, backup failures,
+stale previews/competing writers, unknown replacement acknowledgement, auth/CSRF
+and explicit confirmations. Offline rebuild preview and regenerated strict reader
+passed for supplied hidden data after accounting for the omitted hidden column.
+Fictional-only browser inspection at 375/1440 pixels passed without horizontal
+overflow; form submission rebuilt successfully and admin home became editable.
+No live Sheets access, secrets, cloud resources, staging, commit, push or deployment.
+All changes remain local and uncommitted. Publish and roll out only when authorized;
+then verify backup, rebuild, later admin/RSVP appends and empty-cache restart on the
+real runtime. User-reported prior Cloud Shell container/startup checks predate this
+change. New container/live verification remains pending. Sheets still has no CAS;
+maintenance requires no concurrent writers, and corrupted history may require
+manual backup recovery. Rebuild does not solve calendar/access/network failures.
+
+## Attendance availability during calendar outages (local, 2026-10-02)
+The owner requested that a refresh warning not unnecessarily close attendance.
+Production now distinguishes a successfully validated App Backend from a failing
+original calendar. When only calendar refresh fails, upcoming noncanceled,
+unambiguous saved meetings retain attendance controls. Each POST still rereads the
+backend, checks the current meeting and requires confirmed Sheets persistence;
+backend validation/network failures and failed writes cannot claim a saved response.
+Past/canceled/conflicting meetings stay closed. Demo/read-only stale data retains
+its previous refusal. Admin schedule editing remains paused during source outages.
+
+Replaced the blanket closure text with specific past/conflict/unavailable reasons.
+The schedule warning now explains saved-backend attendance availability, while
+unverifiable data still shows a truthful retry message. Documentation updated.
+Six new regression cases cover cold-instance calendar failure, all/custom/none/clear,
+profile preservation, changed canceled/past/conflicting backend meetings, unreadable
+backend and failed-write rollback. Existing message assertions updated to new copy.
+Final full suite 192 passed; compileall and whitespace checks passed. Initial suite
+failures were old copy expectations (and a Windows cleanup error caused by an early
+failed assertion); after updating those expectations the complete suite passed.
+Fictional browser checks at 375/1440 pixels passed without overflow. Household
+submission and one-tap member deselection both saved during a simulated calendar
+outage. No live Sheets access, secret changes, cloud changes, staging, commit, push
+or deployment. This and the preceding rebuild remain local and uncommitted; actual
+container/live Cloud Run verification of these changes is outstanding.
+
+## Admin outage fix and combined publication (2026-10-02)
+The owner authorized pushing the combined rebuild/availability changes and updating
+the app. Admin editing now uses a verified production backend during source-calendar
+outages, with fresh backend reads, revision checks and confirmed persistence. Source
+recovery still preserves overrides and flags simultaneous changes. Unverifiable
+backend data continues to block edits. Prior statements that admin edits stay paused
+describe the preceding task state and are superseded by this fix.
+
+Full suite: 194 passed; compileall and whitespace checks passed. Two new admin cases
+cover outage edits, source recovery/conflict merge, stale revisions and failed-save
+rollback. Actual fictional browser edit at 375 pixels saved a location during a
+simulated source outage; saved value survived reload without horizontal overflow.
+Combined files reviewed for publication; private configuration/credentials/CSV stay
+ignored. Personal account, branch and origin verified; fetched main matches starting
+HEAD without divergence. Publication includes only original app source/docs/tests.
+No live spreadsheet or secrets accessed/modified. gcloud and Docker are unavailable
+on this workstation. User must perform Cloud Shell source deployment and verify real
+backend rebuild, subsequent admin/attendance writes and empty-cache restart. No live
+repair/deployment has been performed by the agent. Keep backup tabs until verified.

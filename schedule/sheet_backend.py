@@ -208,7 +208,9 @@ class SheetBackend:
         row = self.event_row(event)
         if len(row[16]) > 49000:
             raise DataError("This update exceeds the supported cell size. Reduce the batch or recover manually with all writers stopped.")
-        target = "'" + self.title.replace("'", "''") + "'!A:Q"
+        # Search only the identity column so sparse event rows cannot shift the
+        # logical table to another column. The 17-value row still writes A:Q.
+        target = "'" + self.title.replace("'", "''") + "'!A:A"
         # At most two append attempts, with the exact same event ID and payload.
         # Unknown acceptance is checked before retrying; replay deduplicates late copies.
         for attempt in range(2):

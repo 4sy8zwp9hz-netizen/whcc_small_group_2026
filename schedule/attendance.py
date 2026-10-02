@@ -174,8 +174,23 @@ class Attendance:
             session.permanent = True
         return session["household_id"]
 
+    def schedule_usable(self, snapshot):
+        backend = self.app.extensions.get("backend")
+        return (snapshot.meetings is not None and (not snapshot.stale or
+                bool(backend and backend.strict and backend.attendance_available)))
+
+    def unavailable_reason(self, meeting, snapshot):
+        if meeting.starts_at < self.now():
+            return "Attendance is closed for this past meeting."
+        if meeting.date_conflict:
+            return "This meeting has conflicting calendar information. Ask a leader to confirm it."
+        backend = self.app.extensions.get("backend")
+        if backend and backend.strict:
+            return "Attendance is temporarily unavailable because saved backend data could not be verified. Try refreshing shortly."
+        return "Attendance is temporarily unavailable while the calendar refreshes. Try again shortly."
+
     def allowed(self, meeting, snapshot):
-        return (not snapshot.stale and not meeting.canceled and not meeting.date_conflict
+        return (self.schedule_usable(snapshot) and not meeting.canceled and not meeting.date_conflict
                 and meeting.starts_at >= self.now())
 
     def context(self, meetings, snapshot):
@@ -189,6 +204,7 @@ class Attendance:
             "attendance": self.store.summaries(keys, visitor),
             "attendance_key": self.key,
             "can_respond": lambda meeting: self.allowed(meeting, snapshot),
+            "attendance_unavailable_reason": lambda meeting: self.unavailable_reason(meeting, snapshot),
         }
 
     def csrf_valid(self):
@@ -205,7 +221,7 @@ class Attendance:
         if not self.csrf_valid():
             return self.error("Please reload the page and try again.", 400)
         snapshot = self.cache.get()
-        if snapshot.meetings is None or snapshot.stale:
+        if not self.schedule_usable(snapshot):
             return self.error("The schedule could not refresh. Your response was not changed. Try again shortly.", 503)
         matches = [meeting for meeting in snapshot.meetings if self.key(meeting) == meeting_id]
         if len(matches) != 1 or not self.allowed(matches[0], snapshot):

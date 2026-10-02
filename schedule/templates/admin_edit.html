@@ -1,9 +1,9 @@
 {% extends "admin_base.html" %}
 {% block content %}
 <section class="meeting"><h2>Edit meeting</h2>
-<p>All times are Central. Saving updates the app and queues its backend copy for sync.</p>
+<p>All times are Central. Saving updates the app backend. Production saves must be confirmed in Google Sheets.</p>
 {% if error %}<p class="notice" role="alert">{{ error }} <a href="{{ url_for('admin_edit', key=record.id) }}">Reload latest values</a></p>{% endif %}
-{% if stale %}<p class="notice">The original calendar is unavailable. Reload when it is available before saving.</p>{% endif %}
+{% if stale %}<p class="notice">{% if editing_available %}The original calendar could not refresh. You can edit the verified saved backend; calendar changes will be checked when refresh resumes.{% else %}The saved schedule could not be verified. Reload before saving.{% endif %}</p>{% endif %}
 <form method="post" class="admin-form"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="revision" value="{{ record.revision }}">
 {% if record.conflicts %}<section class="notice"><h3>Review calendar changes</h3><p>Both the app and original calendar changed. Choose which values to use.</p>
 {% for field, incoming in record.conflicts.items() %}
@@ -20,6 +20,6 @@
 {% elif field == 'notes' %}<label class="wide">Notes<textarea name="notes" rows="4" maxlength="2000">{{ values[field] }}</textarea></label>
 {% else %}<label>{{ field|replace('_',' ')|capitalize }}<input name="{{ field }}" type="{{ field if field in ['date','time'] else 'text' }}" value="{{ values[field] }}" maxlength="300" {% if field in ['date','time'] %}required{% endif %}></label>{% endif %}
 {% endfor %}
-</div><button class="rsvp-choice" {% if stale or version_conflict %}disabled{% endif %}>Save changes</button>
+</div><button class="rsvp-choice" {% if not editing_available or version_conflict %}disabled{% endif %}>Save changes</button>
 <a href="{{ url_for('admin_index') }}">Cancel editing</a></form></section>
 {% endblock %}

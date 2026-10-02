@@ -164,7 +164,7 @@ def test_stale_page_200_and_refresh_time_preserved():
     app.extensions["schedule_cache"].retry_at = float("-inf")
     response = client.get("/")
     assert response.status_code == 200
-    assert "Showing the last successful schedule" in response.get_data(as_text=True)
+    assert "Showing the saved schedule" in response.get_data(as_text=True)
     assert "Last successful refresh:" in response.get_data(as_text=True)
 
 

@@ -60,7 +60,10 @@ who cannot come and the change saves immediately. Without JavaScript, use
 
 Responses are per gathering. Repeated taps update the same response. **Clear
 response** removes that gathering's answer while keeping the remembered household.
-Canceled, past, ambiguous, or stale schedules reject attendance changes.
+Canceled, past or ambiguous meetings reject attendance changes. A source-calendar
+refresh failure does not close attendance when the production backend was successfully
+validated. Each response rereads the backend, checks the latest meeting and requires
+confirmed Sheets persistence. Unreadable backend data still blocks responses.
 
 A signed, HttpOnly, SameSite=Lax cookie remembers a random household identifier
 for up to a year. Names and responses stay out of the cookie. They are stored in
@@ -750,3 +753,40 @@ refresh remains stale. This recovery update is local and uncommitted/unpublished
 Validation: 172 tests passed (157 prior cases plus 15 new recovery cases); fictional
 browser recovery and admin-home return passed at 375/1440 pixels without overflow.
 No live Google read/write, deployment, secrets, commit or push was performed.
+
+## Rebuild after visible backend damage
+After deploying this revision, open **Admin → Check backend and recover incomplete
+rows → Preview a backed-up backend rebuild**, or /admin/recovery/rebuild. This page
+works when ordinary backend reads fail due to damaged visible managed cells.
+It reads valid hidden meeting records and replays valid updates in their existing
+order, preserving meeting IDs/links, household profiles/member IDs, historical
+responses and cleared responses. Stale updates remain rejected; repeated update
+IDs deduplicate. It does not import visible-only manual edits. Review the counts.
+Damaged hidden JSON, missing state on identified rows, bad headers or invalid events
+still refuse repair; a blind reset could discard household identity and attendance.
+
+Back up the entire spreadsheet, including hidden state and extra columns. Stop all
+other writers/revisions and manual edits; use only one current runtime and suspend
+member edits/RSVPs for maintenance. Confirm this and type REBUILD. The app creates
+and verifies a new WHCC Recovery tab containing literal managed A:Q values, rechecks
+that the backend has not changed, then replaces A:Q with the recovered snapshot.
+Previous event rows are compacted; their original history remains in that backup.
+Extra columns are untouched and not included in the app-created backup. Keep backup
+tabs until recovery and later writes are confirmed. Unknown replacement acknowledgments
+are read back rather than blindly retried; an interrupted action may leave a backup.
+
+Return to admin home and retry refresh. Rebuild does not repair calendar parsing,
+permissions or network failures. The original calendar is never written. Sheets has
+no transactional compare-and-swap: concurrent writes during repair are unsafe despite
+fingerprint checks. Ordinary restart recovery remains supported; altered/deleted
+stored history may still require manual stopped-writer recovery from backups.
+Normal full-tab write() remains disabled. Normal update appends search only column A
+for the logical table, then write their 17 values to A:Q; real Sheets append placement
+and this new repair need post-deployment verification. No new secrets are required.
+
+Admin editing also remains available during an original-calendar outage when the
+production backend validates. Every save rereads the backend, requires the same
+meeting revision and confirms Sheets persistence; failed writes roll back. When
+calendar refresh resumes, the existing three-way merge preserves app overrides and
+flags simultaneous changes for leader resolution. An invalid/unreachable backend
+still blocks saves until repair/access succeeds.

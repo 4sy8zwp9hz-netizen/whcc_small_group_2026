@@ -2,7 +2,7 @@
 {% block content %}
 <h2>Edit the group schedule</h2>
 <p>Changes here update the app's copy. Leaders can keep editing the original calendar; conflicting changes need your review.</p>
-{% if stale %}<p class="notice" role="alert">Schedule refresh failed. Editing and attendance are paused until the source and backend can be verified. {% if sync.refresh_error %}{{ sync.refresh_error }}{% endif %}</p>{% endif %}
+{% if stale %}<p class="notice" role="alert">Schedule refresh failed. {% if sync.attendance_available %}You can edit the verified saved backend. Attendance remains available for upcoming, confirmed meetings.{% else %}Editing and attendance are paused until saved backend data can be verified.{% endif %} {% if sync.refresh_error %}{{ sync.refresh_error }}{% endif %}</p>{% endif %}
 <section class="sync-status meeting"><h3>Backend sync</h3>
 {% if not sync.enabled %}<p>Local demo mode. Edits are saved on this computer.</p>
 {% elif sync.pending or sync.error %}<p class="notice" role="status">{% if sync.strict %}Google sync is not confirmed. Local storage is temporary; do not assume changes are saved.{% else %}Changes are saved locally and waiting for Google sync.{% endif %} {{ sync.error }}</p>

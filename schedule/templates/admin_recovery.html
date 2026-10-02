@@ -9,7 +9,7 @@
 {% if plan.rows %}
 <p>Rows missing both a meeting identifier and stored app state: {{ plan.rows|join(', ') }}.</p>
 <p>Recovery first copies the managed A:Q cells to a new backup tab and verifies that copy. It then clears only those incomplete rows in A:Q. Columns outside A:Q are untouched. Text entered in incomplete rows is kept in the backup and will not become a meeting.</p>
-<p>Malformed identified records, edited valid rows and damaged update events cannot be repaired here. No full-tab reset or history deletion is offered.</p>
+<p>Malformed identified records, edited valid rows and damaged update events cannot be repaired here. Use the separate rebuild option when the stored app data is intact but visible managed cells are damaged.</p>
 <form method="post" class="admin-form">
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <input type="hidden" name="token" value="{{ plan.token }}">
@@ -19,4 +19,5 @@
 </form>
 {% else %}<p>No incomplete rows found. Retry synchronization from admin home. Other calendar or access errors require separate investigation.</p>{% endif %}
 {% endif %}
+<p><a class="edit-link" href="{{ url_for('admin_rebuild') }}">Preview a backed-up backend rebuild</a></p>
 {% endblock %}
