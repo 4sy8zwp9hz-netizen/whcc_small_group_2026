@@ -24,7 +24,14 @@
   <p class="when">{{ meeting.starts_at|meeting_time }} · {{ meeting.location or 'Location to be confirmed' }}</p>
   {% if meeting.canceled %}<p class="cancel-note">This gathering will not take place.</p>{% endif %}
   {% if meeting.date_conflict %}<p class="notes"><strong>Please confirm this date</strong>This meeting has conflicting calendar information. Confirm plans with a group leader.</p>{% endif %}
-  {% if not meeting.canceled %}{% include "_attendance.html" %}{% endif %}
+  {% if not meeting.canceled %}
+    {% if not featured and not past %}
+    <details class="planned-attendance">
+      <summary>Can you make it?</summary>
+      {% include "_attendance.html" %}
+    </details>
+    {% else %}{% include "_attendance.html" %}{% endif %}
+  {% endif %}
   <details class="meeting-details" {% if not past %}open{% endif %}>
     <summary>Assignments{% if meeting.notes %} & notes{% endif %}</summary>
     <dl class="assignments">

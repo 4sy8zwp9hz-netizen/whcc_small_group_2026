@@ -598,3 +598,13 @@ this-week card. Native carets still collapse them; past details retain their
 collapsed default. Render checks and fictional browser checks at 375/1440 passed
 without overflow; collapse and reload/default expansion verified. Whitespace checks
 passed. No live Sheet/cloud changes. Redeploy to expose this display-only update.
+
+## Collapsed planned attendance on upcoming cards (2026-10-02)
+Later upcoming cards use a native collapsed Can you make it? disclosure around
+existing attendance controls. The featured card retains visible attendance and
+upcoming assignments retain their open default. Canceled/past behavior is preserved.
+AJAX replaces only the panel inside the disclosure, keeping it open after saves.
+216 tests passed, compilation and whitespace checks passed. Fictional browser
+checks at 375/1440 verified expanded form, one-tap future selection, unchanged
+this-week response, persisted plans after reload and no horizontal overflow.
+No live Sheet/cloud changes; redeployment is required for this display update.

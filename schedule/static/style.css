@@ -156,3 +156,9 @@ footer { font-size: .75rem; color: var(--muted); line-height: 1.8; border-top: 1
 .admin-filter .member-choice { border: 0; padding-left: 0; }
 
 .guest-setup .rsvp-choice { width: 100%; }
+
+.planned-attendance { margin: 8px 0 12px; border-top: 1px solid var(--line); }
+.planned-attendance > summary {
+  min-height: 44px; padding: 12px 0; font-size: .94rem; font-weight: 700; cursor: pointer;
+}
+.planned-attendance .rsvp-panel { border-top: 0; padding-top: 4px; }

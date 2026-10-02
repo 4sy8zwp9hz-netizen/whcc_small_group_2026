@@ -261,3 +261,25 @@ def test_guest_submit_marks_all_entered_people_going_and_restores_member_control
     page = client.get('/').text
     assert 'All going' in page and 'Not going' in page
     assert '>Submit</button>' not in page
+
+
+
+def test_later_meeting_plans_are_separate_from_this_weeks_response():
+    from test_backend_admin import Source
+    source = Source()
+    source.rows += [{'date': '2026-10-09', 'time': '18:00', 'topic': 'Later fictional gathering'},
+                    {'date': '2026-10-16', 'time': '18:00', 'topic': 'Canceled gathering', 'status': 'canceled'}]
+    app, _, backend, publisher = seed(source=source)
+    client = app.test_client()
+    page = client.get('/').text
+    assert page.count('<details class="planned-attendance">') == 1
+    assert 'Can you make it?' in page
+    with client.session_transaction() as session:
+        csrf = session['csrf']
+    later = next(r['id'] for r in backend.records() if r['values']['date'] == '2026-10-09')
+    assert client.post('/attendance/' + later, data={'csrf': csrf, 'action': 'all', 'people': 'Visitor, Friend'}).status_code == 303
+    replies = {i['record']['values']['date']: i['responses'] for i in publisher.remote}
+    assert not replies['2026-10-02'] and not replies['2026-10-16']
+    assert len(replies['2026-10-09'][0]['attending']) == 2
+    page = client.get('/').text
+    assert 'Can you make it?' in page and 'All going' in page

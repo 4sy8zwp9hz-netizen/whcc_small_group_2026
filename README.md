@@ -844,3 +844,7 @@ standalone edits use the same form and protected save route.
 New households and guests use a single **Submit** button, marking all entered
 people as going. After setup, the remembered household has the usual All going,
 Not going and individual attendance controls.
+
+Later upcoming cards keep attendance inside a collapsed **Can you make it?**
+section. Expand it to plan attendance. The featured card keeps its attendance
+controls visible. Assignment sections retain their expanded upcoming default.
