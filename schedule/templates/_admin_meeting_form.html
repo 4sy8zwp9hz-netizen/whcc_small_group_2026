@@ -11,6 +11,20 @@
 {% for field in fields %}
 {% if field == 'special_event' %}<label>Meeting type<select name="special_event"><option value="false" {% if not values[field] %}selected{% endif %}>Regular gathering</option><option value="true" {% if values[field] %}selected{% endif %}>Special event / off week</option></select></label>
 {% elif field == 'status' %}<label>Status<select name="status"><option value="scheduled" {% if values[field] == 'scheduled' %}selected{% endif %}>Scheduled</option><option value="canceled" {% if values[field] in ['canceled','cancelled'] %}selected{% endif %}>Canceled / no meeting</option></select></label>
+{% elif field in assignment_choices %}
+<div class="assignment-field">
+<details class="assignment-picker" data-field="{{ field }}">
+<summary>{{ field|replace('_', ' ')|capitalize }}: <span class="assignment-value">{{ values[field] or 'Choose assignments' }}</span>{% if field in required_assignments and not values[field] and not values.special_event and values.status == 'scheduled' %}<span class="missing">Needs assignment</span>{% endif %}</summary>
+<div class="assignment-options">
+{% set selected_names = values[field].split(' / ') %}
+{% for choice in assignment_choices[field] %}
+<label class="member-choice"><input type="checkbox" name="choices_{{ field }}" value="{{ choice.id }}" data-display="{{ choice.value }}" {% if choice.value in selected_names or (choice.full_name is defined and choice.full_name in selected_names) %}checked{% endif %}>{{ choice.label }}</label>
+{% else %}<p>No roster entries yet. Add households and full member names in Households and attendance.</p>{% endfor %}
+<label class="member-choice picker-mode"><input type="checkbox" name="use_choices_{{ field }}" value="true">Use selected choices when saving</label>
+<label>Custom {{ field|replace('_',' ') }}<input name="{{ field }}" value="{{ values[field] }}" maxlength="300" placeholder="Optional or type an existing assignment"></label>
+</div>
+</details>
+</div>
 {% elif field == 'notes' %}<label class="wide">Notes<textarea name="notes" rows="4" maxlength="2000">{{ values[field] }}</textarea></label>
 {% else %}<label>{{ field|replace('_',' ')|capitalize }}{% if field in required_assignments and not values[field] and not values.special_event and values.status == 'scheduled' %}<span class="missing">Needs assignment</span>{% endif %}<input name="{{ field }}" type="{{ field if field in ['date','time'] else 'text' }}" value="{{ values[field] }}" maxlength="300" {% if field not in ['date','time'] %}placeholder="{{ 'Needs assignment' if field in required_assignments and not values.special_event and values.status == 'scheduled' else 'Optional' }}"{% endif %} {% if field in ['date','time'] %}required{% endif %}></label>{% endif %}
 {% endfor %}

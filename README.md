@@ -835,8 +835,9 @@ access and saved attendance. Choose another household or expand **New household 
 visiting guest?** using its caret. Guest setup is collapsed by default and works
 without JavaScript.
 
-Admin home shows **Show past events** checked by default. Uncheck it and apply the
-filter to show only meetings whose Central start time has not passed. Each card
+Admin home shows **Show past events** unchecked by default, showing only meetings
+whose Central start time has not passed. Check it and apply the filter to include
+past events. Each card
 contains every editable schedule field and its own Save changes button. Required
 blank assignments are labeled; optional blanks remain optional. Both card and
 standalone edits use the same form and protected save route.
@@ -853,3 +854,18 @@ The remembered household is highlighted beside **Can you make it?** on upcoming
 cards, including while collapsed. Selected people are highlighted inside the form.
 This identifies the browser's household; it does not submit a response for future
 meetings. Unsent selections are still labeled Not sent yet.
+
+The **Backend sync and recovery** admin tab (`/admin/backend`) contains sync status,
+refresh/retry controls and links to incomplete-row recovery and
+`/admin/recovery/rebuild`. Repair actions keep their existing previews, authentication,
+CSRF, backup verification and stopped-writer confirmations.
+
+Discussion leader and childcare use expandable checkbox dropdowns listing full
+roster names and households; selected assignments save short names joined by ` / `.
+Host and food offer household choices. Custom text remains available inside each
+dropdown, and untouched historical assignments are preserved. Without JavaScript,
+check **Use selected choices when saving** to apply the checkbox selection.
+In household setup, enter full member names or the optional **Family last name**;
+this appends that surname only to single-word names, preserving identities/history.
+It never guesses a surname from a household title. Same first names can appear
+in saved assignments; full names/households disambiguate choices in the editor.

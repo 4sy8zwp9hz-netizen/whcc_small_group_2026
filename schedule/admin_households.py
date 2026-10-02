@@ -64,6 +64,11 @@ def install_households(app, backend, attendance, signed_in, page):
                                    for m in profile["members"]]
                     new_names = [clean_name(n, 40) for n in re.split(r"[,\n]", request.form.get("new_people", "")) if n.strip()]
                     members += [{"id": secrets.token_hex(12), "name": n} for n in new_names]
+                    surname = request.form.get("family_last_name", "").strip()
+                    if surname:
+                        surname = clean_name(surname, 40)
+                        members = [{**m, "name": clean_name(m["name"] + " " + surname, 40)
+                                    if len(m["name"].split()) == 1 else m["name"]} for m in members]
                     if not 1 <= len(members) <= 20 or len({m["name"].casefold() for m in members}) != len(members):
                         raise ValueError("Use 1–20 people with distinct names or nicknames.")
                     identity = profile["id"] if profile else "import:" + secrets.token_hex(32)

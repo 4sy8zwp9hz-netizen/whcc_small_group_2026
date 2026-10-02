@@ -3,7 +3,7 @@
 <h2>Rebuild the app backend</h2>
 <p>This explicit repair works even when normal backend validation blocks the app. It uses validated stored app data, not visible-only manual edits. The original calendar is never changed.</p>
 {% if error %}<p class="notice" role="alert">{{ error }}</p>{% endif %}
-{% if recovered %}<p class="notice" role="status">Backend rebuilt and verified. The previous managed data is in backup tab {{ recovered }}. Return to admin home to check calendar refresh and synchronization.</p>{% endif %}
+{% if recovered %}<p class="notice" role="status">Backend rebuilt and verified. The previous managed data is in backup tab {{ recovered }}. Return to Backend sync and recovery to check calendar refresh and synchronization.</p>{% endif %}
 {% if plan %}
 {% if plan.header_row > 1 %}<p>The header was displaced to row {{ plan.header_row }} by empty app updates. Rebuild will restore it to row 1 and archive those updates.</p>{% endif %}
 <p>The rebuilt snapshot preserves {{ plan.meetings }} meetings, {{ plan.households }} household profiles and {{ plan.responses }} attendance responses, including historical responses and existing meeting links.</p>
@@ -21,5 +21,5 @@
 <button type="submit">Back up and rebuild backend</button>
 </form>
 {% endif %}
-<p><a href="{{ url_for('admin_index') }}">Return to admin home</a></p>
+<p><a href="{{ url_for('admin_backend') }}">Return to Backend sync and recovery</a></p>
 {% endblock %}

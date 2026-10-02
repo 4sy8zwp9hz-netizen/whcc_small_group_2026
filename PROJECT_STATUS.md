@@ -618,3 +618,23 @@ or highlighting. Existing cookie/auth/CSRF and explicit-save behavior is unchang
 checks verified household selection, remembered badge after reload, checked-name
 highlight styling, and no overflow on upcoming/past at 375/1440 widths.
 No live Sheet/cloud changes. Redeploy to expose this interface update.
+
+## Admin maintenance tab and roster assignment selectors (2026-10-02)
+Admin home now defaults Show past events off. Checking/applying includes past events.
+Backend sync status and refresh/retry controls moved to /admin/backend, linked from
+admin navigation as Backend sync and recovery. That tab links incomplete-row repair
+and /admin/recovery/rebuild; existing repair previews/backups/stopped-writer/auth/CSRF
+requirements remain intact. Sync retry returns to the maintenance tab.
+Discussion leader/childcare use full roster names with household context in checkbox
+dropdowns and save short first names separated by /; host/food select households.
+Custom text and untouched historical assignments remain supported. Server validates
+selected roster IDs, handles explicit empty selections and keeps revision checks.
+Optional family surname in household setup appends only to single-word names,
+preserving IDs/history; surnames are never inferred from household titles.
+220 tests passed, compilation and whitespace checks passed. Fictional browser checks
+at 375/1440 verified filters/navigation, repair links, multiple member choices,
+household choices, saved values after reload and no overflow. Browser-discovered
+blank household preselection bug fixed and rechecked (food saves correctly).
+No live Sheet/cloud changes, no secrets changed. Cloud Run redeploy required.
+Changes ready for reviewed commit/push to existing personal main. If interrupted,
+inspect Git status/HEAD/origin before publishing; preserve all work.

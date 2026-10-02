@@ -307,3 +307,62 @@ def test_upcoming_highlight_follows_remembered_household_without_submitting_plan
     assert all(not item['responses'] for item in publisher.remote)
     assert client.post('/household/back', data={'csrf': csrf}).status_code == 303
     assert 'remembered-household' not in client.get('/').text
+
+
+def test_assignment_dropdowns_save_people_and_families_and_preserve_custom_values():
+    from test_backend_admin import form as meeting_form
+    app, _, backend, publisher = seed()
+    client = app.test_client()
+    csrf = login(client)
+    data = form(client, family_last_name='Example')
+    assert client.post('/admin/households', data=data).status_code == 303
+    profile = publisher.remote[0]['households'][0]
+    assert [m['name'] for m in profile['members']] == ['Alex Example', 'Sam Example']
+    page = client.get('/admin').text
+    assert 'Alex Example (Fictional family)' in page
+    assert not re.search(r'name="choices_food"[^>]*checked', page)
+    assert all('name="choices_' + field + '"' in page for field in ['discussion_leader', 'childcare', 'host', 'food'])
+    members = [m['id'] for m in profile['members']]
+    family = 'import:' + profile['id']
+    record = backend.records()[0]
+    data = meeting_form(record, csrf)
+    data.update({'use_choices_discussion_leader': 'true', 'choices_discussion_leader': members,
+                 'use_choices_childcare': 'true', 'choices_childcare': members[:1],
+                 'use_choices_host': 'true', 'choices_host': [family],
+                 'use_choices_food': 'true', 'choices_food': [family]})
+    assert client.post('/admin/meetings/' + record['id'], data=data).status_code == 303
+    record = backend.records()[0]
+    assert record['values']['discussion_leader'] == 'Alex / Sam'
+    assert record['values']['childcare'] == 'Alex'
+    assert record['values']['host'] == record['values']['food'] == 'Fictional family'
+    data = meeting_form(record, csrf, discussion_leader='Outside visitor')
+    assert client.post('/admin/meetings/' + record['id'], data=data).status_code == 303
+    record = backend.records()[0]
+    assert record['values']['discussion_leader'] == 'Outside visitor'
+    before = copy.deepcopy(publisher.remote)
+    data = meeting_form(record, csrf)
+    data.update({'use_choices_host':'true', 'choices_host':['missing-household']})
+    assert client.post('/admin/meetings/' + record['id'], data=data).status_code == 400
+    assert publisher.remote == before
+    data = meeting_form(record, csrf)
+    data.update({'use_choices_childcare':'true'})
+    assert client.post('/admin/meetings/' + record['id'], data=data).status_code == 303
+    assert backend.records()[0]['values']['childcare'] == ''
+
+
+def test_optional_surname_keeps_member_ids_and_history():
+    app, _, backend, publisher = seed()
+    client = app.test_client()
+    login(client)
+    key = backend.records()[0]['id']
+    create(client, key, 'all')
+    hid = identity(publisher)
+    members = copy.deepcopy(publisher.remote[0]['households'][0]['members'])
+    attending = copy.deepcopy(publisher.remote[0]['responses'][0]['attending'])
+    data = form(client, hid, key, new_people='', family_last_name='Example',
+                **{'member_' + m['id']:m['name'] for m in members})
+    assert client.post('/admin/households', data=data).status_code == 303
+    profile = publisher.remote[0]['households'][0]
+    assert [m['id'] for m in profile['members']] == [m['id'] for m in members]
+    assert publisher.remote[0]['responses'][0]['attending'] == attending
+    assert all(m['name'].endswith(' Example') for m in profile['members'])

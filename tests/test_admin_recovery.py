@@ -164,7 +164,10 @@ def test_cold_admin_remains_available_and_retry_does_not_publish_invalid_state()
     csrf=login(client)
     response=client.get('/admin')
     assert response.status_code==200 and 'Schedule refresh failed' in response.text
-    assert 'Check backend and recover incomplete rows' in response.text
+    assert 'href="/admin/backend"' in response.text
+    maintenance=client.get('/admin/backend')
+    assert maintenance.status_code==200 and 'Check incomplete rows' in maintenance.text
+    assert 'Google sync is not confirmed' in maintenance.text
     assert 'saved locally and waiting' not in response.text
     before=copy.deepcopy(transport.rows)
     assert client.post('/admin/sync',data={'csrf':csrf}).status_code==303

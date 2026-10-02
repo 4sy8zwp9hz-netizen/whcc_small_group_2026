@@ -31,8 +31,22 @@ def install_admin(app, root, backend, attendance):
         return bool(configured and session.get("admin_until", 0) > time.time()
                     and session.get("admin_credential") == hashlib.sha256(configured.encode()).hexdigest())
 
+    def assignment_choices():
+        import json
+        people, families = [], []
+        with attendance.store.lock:
+            rows = attendance.store.connection.execute("SELECT id,name,members FROM households ORDER BY name COLLATE NOCASE,id").fetchall()
+            for row in rows:
+                families.append({"id": row["id"], "label": row["name"], "value": row["name"]})
+                for member in json.loads(row["members"]):
+                    people.append({"id": member["id"], "label": member["name"] + " (" + row["name"] + ")",
+                                   "value": member["name"].split()[0], "full_name": member["name"]})
+        people.sort(key=lambda choice: choice["label"].casefold())
+        return {"discussion_leader": people, "childcare": people, "host": families, "food": families}
+
     def page(template, **context):
         return render_template(template, csrf=csrf(), logged_in=signed_in(),
+                               assignment_choices=assignment_choices(),
                                required_assignments={f.strip() for f in app.config["REQUIRED_ASSIGNMENTS"].split(",") if f.strip()},
                                **context)
 
@@ -77,7 +91,7 @@ def install_admin(app, root, backend, attendance):
         if not signed_in():
             return redirect(url_for("admin_login"))
         snapshot = backend.cache.get()
-        show_past = request.args.get("past_filter") != "1" or request.args.get("show_past") == "true"
+        show_past = request.args.get("show_past") == "true"
         meetings = {m.record_id: m for m in backend.cache.parser(backend.rows())}
         past_ids = {key for key, meeting in meetings.items() if meeting.starts_at < attendance.now()}
         records = [r for r in backend.records() if show_past or r["id"] not in past_ids]
@@ -106,17 +120,33 @@ def install_admin(app, root, backend, attendance):
             try:
                 if not editing_available:
                     raise DataError("The saved backend could not be verified. Reload before editing.")
+                for field, choices in assignment_choices().items():
+                    if request.form.get("use_choices_" + field) == "true":
+                        selected = request.form.getlist("choices_" + field)
+                        by_id = {choice["id"]: choice for choice in choices}
+                        if len(selected) != len(set(selected)) or any(identity not in by_id for identity in selected):
+                            raise ValueError("Invalid assignment selection")
+                        values[field] = " / ".join(by_id[identity]["value"] for identity in selected)
+                        if len(values[field]) > 300:
+                            raise ValueError("Assignment too long")
                 backend.edit(key, request.form.get("revision", ""), values,
                              {field: request.form.get("resolve_" + field) for field in record["conflicts"]})
                 return redirect(url_for("admin_index"), code=303)
             except DataError as exc:
                 error, code = str(exc), 409
             except ValueError:
-                error, code = "Check the date and time, then try again.", 400
+                error, code = "Check the date, time and assignment selections, then try again.", 400
         return page("admin_edit.html", record=record, values=values, fields=EDIT_FIELDS,
                     error=error, stale=snapshot.stale, editing_available=editing_available,
                     version_conflict=(request.method == "POST" and
                                       request.form.get("revision") != str(record["revision"]))), code
+
+    @app.get("/admin/backend")
+    def admin_backend():
+        if not signed_in():
+            return redirect(url_for("admin_login"))
+        snapshot = backend.cache.get()
+        return page("admin_backend.html", sync=backend.status(), stale=snapshot.stale)
 
     @app.post("/admin/sync")
     def admin_sync():
@@ -128,7 +158,7 @@ def install_admin(app, root, backend, attendance):
         snapshot = backend.cache.get()
         if not snapshot.stale:
             backend.publish(force=True)
-        return redirect(url_for("admin_index"), code=303)
+        return redirect(url_for("admin_backend"), code=303)
 
     @app.route("/admin/recovery", methods=["GET", "POST"])
     def admin_recovery():

@@ -16,7 +16,8 @@
 <label>Household name<input name="name" value="{{ profile.name if profile else '' }}" placeholder="The Chungs" maxlength="60" required></label>
 {% if profile %}<fieldset class="member-choices"><legend>Existing people (names can be corrected; identities and history are kept)</legend>{% for m in profile.members %}<label>{{ loop.index }}. Name<input name="member_{{ m.id }}" value="{{ m.name }}" maxlength="40" required></label>{% endfor %}</fieldset>{% endif %}
 <label>{{ 'Add people' if profile else 'People in this household' }}<textarea name="new_people" rows="3" placeholder="Matt, Diana, Meowi, Zane" {% if not profile %}required{% endif %}></textarea></label>
-<p class="subtle">Separate names with commas or new lines. Up to 20 people. People added here are included by All going.</p>
+<label>Family last name (optional)<input name="family_last_name" maxlength="40" placeholder="e.g. Chung"></label>
+<p class="subtle">Enter full member names, or supply a family last name to append to single-word names. Existing full names are kept. Separate names with commas or new lines. Up to 20 people. People added here are included by All going.</p>
 <button class="rsvp-choice" name="action" value="profile" {% if not available %}disabled{% endif %}>Save household only</button>
 {% if meeting_id %}
 {% if profile %}<fieldset class="member-choices"><legend>People going</legend>{% for m in profile.members %}<label class="member-choice"><input type="checkbox" name="attending" value="{{ m.id }}" {% if m.id in selected_ids %}checked{% endif %}>{{ m.name }}</label>{% endfor %}</fieldset>

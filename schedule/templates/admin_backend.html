@@ -1,0 +1,18 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<h2>Backend sync and recovery</h2>
+{% if stale %}<p class="notice" role="alert">Calendar refresh is delayed. {% if sync.refresh_error %}{{ sync.refresh_error }}{% endif %}</p>{% endif %}
+<section class="sync-status meeting"><h3>Backend sync</h3>
+<p>Saves append App update rows at the bottom of the App Backend tab. Managed state holds the latest values; the original meeting rows are a snapshot and may look unchanged. The original calendar is never edited by this app.</p>
+{% if not sync.enabled %}<p>Local demo mode. Edits are saved on this computer.</p>
+{% elif sync.pending or sync.error %}<p class="notice" role="status">{% if sync.strict %}Google sync is not confirmed. Local storage is temporary; do not assume changes are saved.{% else %}Changes are saved locally and waiting for Google sync.{% endif %} {{ sync.error }}</p>
+{% else %}<p>Up to date with the app's backend tab.</p>{% endif %}
+{% if sync.last_sync %}<p class="subtle">Last successful backend sync: {{ sync.last_sync }}</p>{% endif %}
+<form action="{{ url_for('admin_sync') }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="rsvp-choice">Refresh calendar and retry sync</button></form></section>
+<section class="meeting">
+<h3>Backend recovery</h3>
+<p>Use recovery only when backend data needs repair. Preview the proposed changes first; backups and stopped writers are required before replacing managed data.</p>
+<p><a class="edit-link" href="{{ url_for('admin_recovery') }}">Check incomplete rows</a></p>
+<p><a class="edit-link" href="{{ url_for('admin_rebuild') }}">Preview a backed-up backend rebuild</a></p>
+</section>
+{% endblock %}

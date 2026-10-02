@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}Schedule admin{% endblock %} · WHCC</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"><script src="{{ url_for('static', filename='admin_assignments.js') }}" defer></script></head>
 <body><header class="site-header"><div class="brand-mark" aria-hidden="true">W</div><div><p class="eyebrow">WHCC small group</p><h1>Schedule admin</h1></div></header>
 <main class="admin-page"><nav><a href="{{ url_for('upcoming') }}">View schedule</a>
-{% if logged_in %}<a href="{{ url_for('admin_index') }}">Admin home</a><a href="{{ url_for('admin_households') }}">Households and attendance</a><form action="{{ url_for('admin_logout') }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="text-button">Sign out</button></form>{% endif %}</nav>
+{% if logged_in %}<a href="{{ url_for('admin_index') }}" {% if request.endpoint in ['admin_index', 'admin_edit'] %}aria-current="page"{% endif %}>Admin home</a><a href="{{ url_for('admin_households') }}">Households and attendance</a><a href="{{ url_for('admin_backend') }}" {% if request.endpoint in ['admin_backend', 'admin_recovery', 'admin_rebuild'] %}aria-current="page"{% endif %}>Backend sync and recovery</a><form action="{{ url_for('admin_logout') }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="text-button">Sign out</button></form>{% endif %}</nav>
 {% block content %}{% endblock %}</main></body></html>

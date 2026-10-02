@@ -390,7 +390,7 @@ def local_path():
         assert path.parent == cache
         yield path
 
-def test_admin_past_filter_defaults_checked_and_uses_meeting_start_in_chicago():
+def test_admin_past_filter_defaults_off_and_uses_meeting_start_in_chicago():
     source = Source()
     source.rows += [{"date": "2026-09-01", "time": "18:00", "topic": "Past fictional meeting"},
                     {"date": "2026-09-02", "time": "18:00", "topic": "Past canceled meeting", "status": "canceled"},
@@ -399,9 +399,9 @@ def test_admin_past_filter_defaults_checked_and_uses_meeting_start_in_chicago():
     client = app.test_client()
     login(client)
     page = client.get("/admin").text
-    assert 'name="show_past" value="true" checked' in page
-    assert page.count('action="/admin/meetings/') == 4
-    assert "Past event" in page and "Past fictional meeting" in page
+    assert 'name="show_past" value="true" checked' not in page
+    assert page.count('action="/admin/meetings/') == 2
+    assert "Past event" not in page and "Past fictional meeting" not in page
     hidden = client.get("/admin?past_filter=1").text
     assert "Past fictional meeting" not in hidden and "Past canceled meeting" not in hidden
     assert "Starting now" in hidden and hidden.count('action="/admin/meetings/') == 2
@@ -426,3 +426,22 @@ def test_admin_cards_show_all_editable_fields_and_keep_protected_save_behavior()
     assert 'value="Fictional room"' in client.get("/admin").text
     assert not source.rows[0].get("location")
     assert client.post(url, data=form(record, csrf, location="Stale room")).status_code == 409
+
+
+def test_backend_tab_separates_sync_controls_and_keeps_auth_csrf():
+    app, _, backend = make()
+    client = app.test_client()
+    assert client.get('/admin/backend').location.endswith('/admin/login')
+    csrf = login(client)
+    home = client.get('/admin').text
+    assert 'href="/admin/backend"' in home
+    assert 'action="/admin/sync"' not in home
+    assert 'href="/admin/recovery/rebuild"' not in home
+    page = client.get('/admin/backend').text
+    assert 'Local demo mode.' in page
+    assert 'action="/admin/sync"' in page
+    assert 'href="/admin/recovery/rebuild"' in page
+    assert 'href="/admin/recovery"' in page
+    assert client.post('/admin/sync', data={'csrf': 'bad'}).status_code == 400
+    result = client.post('/admin/sync', data={'csrf': csrf})
+    assert result.status_code == 303 and result.location.endswith('/admin/backend')

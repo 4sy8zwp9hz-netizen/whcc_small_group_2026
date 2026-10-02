@@ -165,3 +165,9 @@ footer { font-size: .75rem; color: var(--muted); line-height: 1.8; border-top: 1
 
 .remembered-household { display: inline-block; background: var(--accent); color: var(--ink); border-radius: 6px; padding: 2px 7px; font-size: .8rem; max-width: 100%; }
 .rsvp-form .member-choice:has(input:checked) { background: var(--accent); color: var(--ink); border-color: #688635; }
+
+.assignment-picker { border: 1px solid #91a599; border-radius: 8px; min-width: 0; }
+.assignment-picker > summary { min-height: 44px; padding: 10px; font-size: .9rem; cursor: pointer; }
+.assignment-options { padding: 10px; display: grid; gap: 8px; max-height: 320px; overflow-y: auto; }
+.assignment-options .member-choice { font-size: .85rem; }
+.assignment-options [hidden] { display: none; }

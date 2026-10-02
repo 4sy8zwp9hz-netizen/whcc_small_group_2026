@@ -3,7 +3,7 @@
 <h2>Backend recovery</h2>
 <p>Check incomplete rows without changing the calendar, valid meetings or attendance history.</p>
 {% if error %}<p class="notice" role="alert">{{ error }}</p>{% endif %}
-{% if recovered %}<p class="notice" role="status">Incomplete rows cleared after verification. Managed data was preserved in backup tab {{ recovered }}. Return to admin home to check synchronization.</p>{% endif %}
+{% if recovered %}<p class="notice" role="status">Incomplete rows cleared after verification. Managed data was preserved in backup tab {{ recovered }}. Return to Backend sync and recovery to check synchronization.</p>{% endif %}
 {% if plan %}
 <p>{{ plan.meetings }} valid meeting records can be preserved.</p>
 {% if plan.rows %}
@@ -17,7 +17,8 @@
 <p>Keep the entire spreadsheet backed up, including any extra columns. Sheets has no transactional compare-and-swap; overlapping writers can invalidate recovery. Use one current runtime for this maintenance action.</p>
 <button type="submit">Back up and clear incomplete rows</button>
 </form>
-{% else %}<p>No incomplete rows found. Retry synchronization from admin home. Other calendar or access errors require separate investigation.</p>{% endif %}
+{% else %}<p>No incomplete rows found. Retry synchronization from Backend sync and recovery. Other calendar or access errors require separate investigation.</p>{% endif %}
 {% endif %}
 <p><a class="edit-link" href="{{ url_for('admin_rebuild') }}">Preview a backed-up backend rebuild</a></p>
+<p><a href="{{ url_for('admin_backend') }}">Return to Backend sync and recovery</a></p>
 {% endblock %}
