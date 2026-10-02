@@ -2,13 +2,14 @@
 {% block content %}
 <h2>Edit the group schedule</h2>
 <p>Changes here update the app's copy. Leaders can keep editing the original calendar; conflicting changes need your review.</p>
-{% if stale %}<p class="notice" role="alert">The calendar could not refresh. Editing is paused until it is available.</p>{% endif %}
+{% if stale %}<p class="notice" role="alert">Schedule refresh failed. Editing and attendance are paused until the source and backend can be verified. {% if sync.refresh_error %}{{ sync.refresh_error }}{% endif %}</p>{% endif %}
 <section class="sync-status meeting"><h3>Backend sync</h3>
 {% if not sync.enabled %}<p>Local demo mode. Edits are saved on this computer.</p>
-{% elif sync.pending or sync.error %}<p class="notice" role="status">Changes are saved locally and waiting for Google sync. {{ sync.error }}</p>
+{% elif sync.pending or sync.error %}<p class="notice" role="status">{% if sync.strict %}Google sync is not confirmed. Local storage is temporary; do not assume changes are saved.{% else %}Changes are saved locally and waiting for Google sync.{% endif %} {{ sync.error }}</p>
 {% else %}<p>Up to date with the app's backend tab.</p>{% endif %}
 {% if sync.last_sync %}<p class="subtle">Last successful backend sync: {{ sync.last_sync }}</p>{% endif %}
 <form action="{{ url_for('admin_sync') }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="rsvp-choice">Refresh calendar and retry sync</button></form></section>
+{% if sync.enabled and (stale or sync.error) %}<p><a class="edit-link" href="{{ url_for('admin_recovery') }}">Check backend and recover incomplete rows</a></p>{% endif %}
 <div class="meeting-grid">
 {% for record in records %}<article class="meeting">
 <p class="eyebrow">{{ record["values"].date }} · {{ record["values"].time }} Central</p>

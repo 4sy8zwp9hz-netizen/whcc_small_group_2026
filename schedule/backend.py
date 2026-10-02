@@ -73,6 +73,7 @@ class Backend:
         self.strict = app.config.get("STRICT_DURABILITY", False)
         self.retry_at = 0
         self.sync_error = ""
+        self.refresh_error = ""
         self.scope = hashlib.sha256(attendance.namespace.encode()).hexdigest()
         with self.store.lock, self.store.connection:
             self.store.connection.executescript("""
@@ -126,6 +127,16 @@ class Backend:
             (self.scope, record["id"], encode(record)))
 
     def read(self):
+        try:
+            result = self.refresh_schedule()
+            self.refresh_error = ""
+            return result
+        except Exception as exc:
+            self.refresh_error = (str(exc) if isinstance(exc, DataError) else
+                                  "Google could not refresh the schedule or backend. Check access and retry.")
+            raise
+
+    def refresh_schedule(self):
         base = None
         if self.strict:
             with self.store.lock, self.store.connection:
@@ -324,4 +335,5 @@ class Backend:
         with self.store.lock:
             pending = bool(self.publisher and digest(self.export()) != self.meta("published_hash"))
             return {"enabled": bool(self.publisher), "pending": pending,
-                    "error": self.sync_error, "last_sync": self.meta("last_sync")}
+                    "error": self.sync_error, "refresh_error": self.refresh_error,
+                    "strict": self.strict, "last_sync": self.meta("last_sync")}

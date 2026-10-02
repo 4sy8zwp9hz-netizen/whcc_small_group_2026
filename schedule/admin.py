@@ -113,9 +113,37 @@ def install_admin(app, root, backend, attendance):
         if not attendance.csrf_valid():
             abort(400)
         backend.invalidate()
-        backend.cache.get()
-        backend.publish(force=True)
+        snapshot = backend.cache.get()
+        if not snapshot.stale:
+            backend.publish(force=True)
         return redirect(url_for("admin_index"), code=303)
+
+    @app.route("/admin/recovery", methods=["GET", "POST"])
+    def admin_recovery():
+        if not signed_in():
+            return redirect(url_for("admin_login"))
+        if request.method == "POST" and not attendance.csrf_valid():
+            abort(400)
+        if not backend.publisher or not hasattr(backend.publisher, "decode_table"):
+            return page("admin_recovery.html", plan=None, error="Google backend recovery is unavailable in local demo mode.", recovered=None), 409
+        from .recovery import BackendRecovery
+        recovery = BackendRecovery(backend.publisher)
+        error, code, recovered, plan = "", 200, None, None
+        try:
+            with backend.store.lock:
+                if request.method == "POST":
+                    if request.form.get("writers_stopped") != "yes":
+                        raise DataError("Confirm that other writers are stopped before recovery.")
+                    recovered = recovery.repair(request.form.get("token", ""))
+                    backend.sync_error = ""
+                plan = recovery.preview()
+            if recovered:
+                backend.invalidate()
+                backend.cache.get()
+        except Exception as exc:
+            error = str(exc) if isinstance(exc, DataError) else "Recovery could not be confirmed. Check the retained backup before retrying."
+            code = 409 if isinstance(exc, DataError) else 503
+        return page("admin_recovery.html", plan=plan, error=error, recovered=recovered), code
 
     @app.cli.command("set-admin-password")
     @click.password_option(confirmation_prompt=True)

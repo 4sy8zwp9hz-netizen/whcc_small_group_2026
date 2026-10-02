@@ -125,6 +125,10 @@ class SheetBackend:
         target = "'" + self.title.replace("'", "''") + "'!A:Q"
         table = self.get("/values/" + quote(target, safe=""),
                              params={"valueRenderOption": "UNFORMATTED_VALUE"}).get("values", [])
+        return self.decode_table(table)
+
+    def decode_table(self, table):
+        """Validate a fetched or offline table without making API requests."""
         if not table or table[0] != HEADERS:
             raise DataError("The backend tab has unexpected columns. Nothing was overwritten.")
         try:

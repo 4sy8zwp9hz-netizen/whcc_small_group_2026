@@ -715,3 +715,38 @@ a preview-only Content-Security-Policy (script-src 'none'). Docker is unavailabl
 Cloud Run ADC and managed HTTPS verification remain outstanding. No live Sheets or
 cloud changes or deployment were performed. The owner subsequently authorized
 staging, committing and pushing the reviewed project changes to main.
+
+
+## Admin recovery for incomplete backend rows
+If the Google backend cannot be validated, admin home remains reachable and offers
+**Check backend and recover incomplete rows** at /admin/recovery. The preview is
+read-only. It identifies populated managed rows that have neither a meeting ID nor
+stored app state. Every retained baseline, visible cell and update event must pass
+the existing strict validator; identified records or damaged history are not skipped.
+
+Only after separate admin authentication, CSRF validation, a current preview and
+confirmation that other writers/manual sheet edits have stopped, recovery creates a
+new WHCC Recovery backup tab containing the entire fetched A:Q range as literal
+values. It reads and verifies the backup, rechecks the original fingerprint, then
+clears only the previewed incomplete rows in A:Q. It never deletes a row, rewrites
+valid records/history, or edits the original calendar. Columns outside A:Q remain
+untouched; keep a complete spreadsheet backup separately when extra columns exist.
+Incomplete-row text is archived, not imported as meetings. Use the original calendar
+for new meetings and the admin editor for changes to existing meetings.
+
+If the backup fails verification or the sheet changes after preview, nothing is
+cleared. An unknown clear acknowledgment is inspected without repeating the clear.
+An interrupted recovery can leave a backup tab; inspect it before retrying. Sheets
+has no transactional compare-and-swap: stopping competing writers remains necessary.
+Do not use this screen to restore missing/deleted history or to force a malformed
+identified record into validity; those cases still require stopped-writer recovery
+from a complete verified backup. Current state restoration cannot recover data that
+was already lost by a previous spreadsheet version-history rewind.
+
+On Cloud Run, synchronization warnings now say that local storage is temporary and
+writes are unconfirmed. Backend refresh errors appear directly on admin home rather
+than implying that only the original calendar failed. Retry does not publish when
+refresh remains stale. This recovery update is local and uncommitted/unpublished.
+Validation: 172 tests passed (157 prior cases plus 15 new recovery cases); fictional
+browser recovery and admin-home return passed at 375/1440 pixels without overflow.
+No live Google read/write, deployment, secrets, commit or push was performed.

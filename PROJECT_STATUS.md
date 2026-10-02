@@ -362,3 +362,41 @@ Docker build/execution, non-root /tmp access, real Cloud Run ADC and managed HTT
 verification remain outstanding. Sheets remains authoritative with editable history
 and manual stopped-writer backup/recovery limitations. The secret helper's --help
 was inspected only; neither mode was run against real settings.
+
+
+## Admin backend recovery (local, 2026-10-02)
+The owner reported invalid backend records after manual sheet edits and a version
+history rewind. An owner-supplied CSV under ignored private/ was inspected offline;
+no private rows, IDs or values were copied into source, tests or public docs. The
+CSV itself was unchanged. A narrow recovery preview validated all retained records
+and identified only unidentified rows missing hidden app state as candidates.
+
+Added /admin/recovery, accessible through existing group/admin authentication even
+when the backend cannot refresh. Preview is read-only; POST requires CSRF, admin
+expiry checks, a fresh table fingerprint and explicit stopped-writer confirmation.
+The runtime first creates a new backup tab with literal copies of managed A:Q data
+and verifies it. It rechecks for competing changes and clears only eligible incomplete
+A:Q ranges, preserving valid meetings, profiles/member IDs, replies and update events.
+No original calendar writes, full-tab replacement, row deletion or automatic reset.
+Malformed identified records, edited retained cells, bad events and headers fail
+closed. Extra columns are untouched, not included in the managed backup; keep a
+complete spreadsheet backup as well. Clearing acknowledgment is checked without a
+blind retry. An interrupted attempt may leave a backup tab for manual inspection.
+Sheets has no CAS; all other writers/manual edits must stop for maintenance.
+
+Admin home shows the underlying refresh error and warns that Cloud Run local storage
+is temporary/unconfirmed. Sync retry skips publication when refresh remains stale.
+Validation: full suite 172 passed; 15 new recovery cases cover preserved legacy/v2
+history, household data, strict refusals, verified literal backups, stale previews,
+backup failure/mismatch, overlapping edits, lost acknowledgment, auth/CSRF/confirmation
+and cold admin availability. An offline preview of the supplied CSV passed without
+changing it. Fictional browser checks passed at 375/1440 pixels without overflow,
+including keyboard confirmation, recovery, and return to editable admin home.
+Compilation and whitespace checks passed. Changes are LOCAL AND UNCOMMITTED; HEAD
+and index unchanged from the previously published revision. No live Google API calls,
+cloud changes, deployment, real secrets, staging, commit or push in this task.
+The owner separately reports Docker build/isolated production startup passed in
+Cloud Shell and a running Cloud Run website; these were not independently verified
+here. This new recovery code has not been container-tested or deployed. Review and
+publish it, then perform an explicitly authorized rollout before it appears on the
+running website. Never deploy or repair the live backend without that authorization.

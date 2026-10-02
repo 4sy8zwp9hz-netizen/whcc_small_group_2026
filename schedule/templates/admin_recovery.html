@@ -1,0 +1,22 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<h2>Backend recovery</h2>
+<p>Check incomplete rows without changing the calendar, valid meetings or attendance history.</p>
+{% if error %}<p class="notice" role="alert">{{ error }}</p>{% endif %}
+{% if recovered %}<p class="notice" role="status">Incomplete rows cleared after verification. Managed data was preserved in backup tab {{ recovered }}. Return to admin home to check synchronization.</p>{% endif %}
+{% if plan %}
+<p>{{ plan.meetings }} valid meeting records can be preserved.</p>
+{% if plan.rows %}
+<p>Rows missing both a meeting identifier and stored app state: {{ plan.rows|join(', ') }}.</p>
+<p>Recovery first copies the managed A:Q cells to a new backup tab and verifies that copy. It then clears only those incomplete rows in A:Q. Columns outside A:Q are untouched. Text entered in incomplete rows is kept in the backup and will not become a meeting.</p>
+<p>Malformed identified records, edited valid rows and damaged update events cannot be repaired here. No full-tab reset or history deletion is offered.</p>
+<form method="post" class="admin-form">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<input type="hidden" name="token" value="{{ plan.token }}">
+<label class="remember-device"><input type="checkbox" name="writers_stopped" value="yes" required> I have stopped all other app writers and manual sheet edits. I understand that incomplete-row entries will be archived, not imported.</label>
+<p>Keep the entire spreadsheet backed up, including any extra columns. Sheets has no transactional compare-and-swap; overlapping writers can invalidate recovery. Use one current runtime for this maintenance action.</p>
+<button type="submit">Back up and clear incomplete rows</button>
+</form>
+{% else %}<p>No incomplete rows found. Retry synchronization from admin home. Other calendar or access errors require separate investigation.</p>{% endif %}
+{% endif %}
+{% endblock %}
