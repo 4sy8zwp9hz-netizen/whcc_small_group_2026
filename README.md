@@ -72,12 +72,12 @@ a locally generated signing secret persists in private/session.key. Both are
 ignored by Git. Back up these files privately together to preserve local attendance.
 Cloning source code does not transfer attendance or remembered households.
 
-This is a prototype without verified identities or cross-device household recovery.
-Another browser, cleared cookies, or **Forget this household on this browser**
-creates a new identity and may produce a duplicate household. Forgetting preserves
-existing responses but loses the ability to edit them from that browser. There is
-no roster-editing UI yet. Website access, recovery, and leader correction tools must
-be decided before broader use with real household information.
+This prototype uses shared group access without verified individual identities.
+Another browser or cleared cookies can reconnect by choosing the existing household.
+Creating a new profile instead may produce duplicates. **Forget this household on
+this browser** removes recognition and preserves existing responses. Leaders can
+correct rosters and attendance at /admin/households. Decide what group members may
+see and edit before broader use with real information.
 
 Optional environment settings:
 ```dotenv
@@ -802,3 +802,29 @@ rebuild restores the header to row 1. Do not manually delete/move rows or change
 hidden state. Stop old revisions/writers before repair; verify refresh and a later
 admin/attendance update after it. Numeric-tab appendCells replaces values.append;
 normal full-tab replacement remains disabled. Backups are still retained.
+
+
+## Household setup and where saves go
+Admin home links to **Households and attendance** (/admin/households). Create a
+household with 1–20 comma/newline-separated people, or load an existing household.
+Correct names or add people without replacing existing member IDs. Choose an
+upcoming confirmed gathering, then use All going, Not going, per-person checkboxes,
+or Clear this response. Save household only leaves attendance unanswered/unchanged.
+Removing people/households is deliberately unavailable to preserve history.
+Admin forms reject newer profile/response/meeting changes rather than overwrite them.
+
+On the member schedule, choose your existing household, then tap who is going.
+Selecting a household remembers it on this browser and does not submit attendance.
+Guests can enter their own name (and anyone joining them); household name is optional.
+Before creating a household, look for an existing one to avoid duplicates.
+This shared-group roster selection is not identity verification: anyone with group
+access can select a household and edit its response. Use it only for this trusted
+small group. Group/admin authentication and CSRF protection remain in place.
+
+Google saves append literal **App update** rows below the data in **App Backend**,
+with granular changes in the managed state column. The original meeting rows are
+a snapshot and are not rewritten for each change, so their displayed cells/counts
+may be old. The app replays accepted updates to show current schedule/attendance.
+Do not manually edit, sort or delete these rows. The original calendar stays
+read-only to the app. The admin sync status reports confirmed Sheets persistence;
+local demo mode and pending development sync are labeled separately.

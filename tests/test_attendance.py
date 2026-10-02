@@ -130,7 +130,7 @@ def test_csrf_required_and_invalid_tokens_never_write(token):
 
 
 @pytest.mark.parametrize("fields", [
-    {"household": ""}, {"people": ""}, {"people": "Alex, Alex"},
+    {"people": ""}, {"people": "Alex, Alex"},
     {"people": ",".join("Person"+str(i) for i in range(21))},
     {"household": "a" * 61}, {"people": "a" * 41},
 ])

@@ -34,6 +34,9 @@ def install_admin(app, root, backend, attendance):
     def page(template, **context):
         return render_template(template, csrf=csrf(), logged_in=signed_in(), **context)
 
+    from .admin_households import install_households
+    install_households(app, backend, attendance, signed_in, page)
+
     @app.route("/admin/login", methods=["GET", "POST"])
     def admin_login():
         configured = password_hash()

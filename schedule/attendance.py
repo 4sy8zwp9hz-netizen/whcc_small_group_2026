@@ -78,12 +78,12 @@ class AttendanceStore:
             if household is None:
                 if action not in {"all", "none"}:
                     raise ValueError("Enter your household first, then choose All going or Not going.")
-                household_name = clean_name(name)
                 names = [clean_name(part, 40) for part in re.split(r"[,\n]", people) if part.strip()]
                 if not 1 <= len(names) <= 20:
                     raise ValueError("Enter between 1 and 20 people, separated by commas.")
                 if len({name.casefold() for name in names}) != len(names):
                     raise ValueError("Give each person a distinct name or nickname.")
+                household_name = clean_name(name or names[0] + " household")
                 members = [{"id": secrets.token_hex(12), "name": name} for name in names]
                 household = {"name": household_name, "members": members}
                 self.connection.execute(
@@ -158,6 +158,7 @@ class Attendance:
             source = str((root / app.config["CSV_PATH"]).resolve())
         self.namespace = app.config["DATA_SOURCE"] + "\0" + source
         app.add_url_rule("/attendance/<meeting_id>", "save_attendance", self.save, methods=["POST"])
+        app.add_url_rule("/household/select", "select_household", self.select_household, methods=["POST"])
         app.add_url_rule("/household/forget", "forget_household", self.forget, methods=["POST"])
 
     def key(self, meeting):
@@ -201,6 +202,7 @@ class Attendance:
         return {
             "sync_pending": backend.status()["pending"] if backend else False,
             "household": household, "csrf": session["csrf"],
+            "household_choices": self.roster() if household is None else [],
             "attendance": self.store.summaries(keys, visitor),
             "attendance_key": self.key,
             "can_respond": lambda meeting: self.allowed(meeting, snapshot),
@@ -272,6 +274,34 @@ class Attendance:
         }
         return jsonify(panels=panels, message=("Response cleared." if action == "clear" else "Attendance saved.")
                        + ("" if synced else " Saved locally; Google sync is pending."))
+
+    def roster(self):
+        with self.store.lock:
+            return [{"id": row["id"][7:] if row["id"].startswith("import:") else hashlib.sha256(row["id"].encode()).hexdigest(),
+                     "name": row["name"]}
+                    for row in self.store.connection.execute("SELECT id,name FROM households ORDER BY name COLLATE NOCASE,id")]
+
+    def select_household(self):
+        if not self.csrf_valid():
+            return self.error("Please reload the page and try again.", 400)
+        snapshot = self.cache.get()
+        backend = self.app.extensions.get("backend")
+        try:
+            with self.store.lock, self.store.connection:
+                if backend and backend.strict:
+                    backend.refresh_remote()
+                if not self.schedule_usable(snapshot):
+                    return self.error("Households are temporarily unavailable. Try refreshing.", 503)
+                selected = request.form.get("household_id", "")
+                choice = next((h for h in self.roster() if h["id"] == selected), None)
+                if choice is None:
+                    return self.error("That household was not found. Reload before choosing.", 404)
+                identity = next(row["id"] for row in self.store.connection.execute("SELECT id FROM households")
+                                if (row["id"][7:] if row["id"].startswith("import:") else hashlib.sha256(row["id"].encode()).hexdigest()) == selected)
+                session["household_id"] = identity
+        except Exception:
+            return self.error("Households could not be verified. Try refreshing.", 503)
+        return redirect(url_for("upcoming"), code=303)
 
     def forget(self):
         if not self.csrf_valid():

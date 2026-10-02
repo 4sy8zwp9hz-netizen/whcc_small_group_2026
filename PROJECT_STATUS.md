@@ -514,3 +514,37 @@ publication; no copied private event IDs, sheet rows or credentials. The owner
 previously authorized publication to main; this is the follow-up reliability fix.
 Container and actual Google/Cloud Run append/recovery checks remain outstanding.
 No deployment, live repair, cloud resources or real secret changes were performed.
+
+## Admin households and member/guest entry (2026-10-02)
+Added /admin/households with existing group/admin gates, CSRF and stale-form tokens.
+Leaders can create profiles, correct household/member names, add people, and record
+all/none/per-person/clear responses for upcoming confirmed meetings. Existing member
+IDs and historical responses are preserved; no deletion UI is provided. Production
+rereads Sheets, rechecks profile/meeting/response state and requires confirmed append
+persistence; failed saves restore the verified previous state. Other writers'
+unrelated updates are retained and same-profile stale forms are rejected.
+
+Members can select an existing household on the schedule; selection remembers it
+without submitting attendance. Guests can enter their own names with an optional
+household label. These are shared-group selections, not verified individual accounts:
+anyone with the group password can select a household and edit its response.
+No new secrets or identity services were introduced. Authentication/CSRF remain.
+
+With the owner's explicit live-access authorization, a read-only backend inspection
+confirmed 39 valid meetings and three schedule update events; the latest included a
+location override. No live sheet values were modified. App saves are append events
+below the baseline snapshot; visible baseline cells/counts need not reflect current
+state. Admin home and README now explain this. Original calendar remains read-only.
+
+Validation: 210 passing tests, compilation and whitespace checks passed. The first
+full run found the prior test requiring a household label; that expectation was
+updated for authorized guest entry and the complete suite passed. New regressions
+cover stale profiles/responses, independent admin writers using real append adapter
+with mocked transport, granular payloads, stable member IDs, empty-cache restoration,
+invalid names/rosters, failed append rollback and remembered profile selection.
+Isolated fictional browser submissions verified admin all/custom attendance, member
+selection and one-tap change, guest name-only submission, persistence after reload,
+and 375/1440 layouts without horizontal overflow. Real Sheets was only read; no test
+households were created there. Cloud Run must be redeployed to expose these forms.
+Docker/gcloud are unavailable locally; this revision's container/live write checks
+remain outstanding. Prior user-reported container checks predate this revision.

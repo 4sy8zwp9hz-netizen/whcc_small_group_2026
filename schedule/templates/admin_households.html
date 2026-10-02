@@ -1,0 +1,29 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<h2>Households and attendance</h2>
+<p>Set up a household, then choose who is going to a gathering. Saved rosters remain available for later meetings.</p>
+{% if saved %}<p class="notice" role="status">{% if sync.enabled and not sync.pending and not sync.error %}Saved and confirmed in Google Sheets.{% elif sync.enabled %}Saved locally; Google sync is pending.{% else %}Saved in this local demo.{% endif %}</p>{% endif %}
+{% if error %}<p class="notice" role="alert">{{ error }}</p>{% endif %}
+{% if not available %}<p class="notice">The saved schedule is unavailable. Reload before saving.</p>{% endif %}
+<form method="get" class="admin-form meeting">
+<label>Household<select name="household_id"><option value="">Create a household</option>{% for h in roster %}<option value="{{ h.id }}" {% if selected == h.id %}selected{% endif %}>{{ h.name }}</option>{% endfor %}</select></label>
+<label>Gathering<select name="meeting_id"><option value="">Roster only</option>{% for m in choices %}<option value="{{ m.record_id }}" {% if meeting_id == m.record_id %}selected{% endif %}>{{ m.starts_at.strftime('%b %d, %Y · %I:%M %p') }} — {{ m.topic or 'Small group' }}</option>{% endfor %}</select></label>
+<button class="rsvp-choice">Load household and gathering</button>
+</form>
+<form method="post" class="admin-form meeting">
+<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="token" value="{{ token }}">
+<input type="hidden" name="household_id" value="{{ selected }}"><input type="hidden" name="meeting_id" value="{{ meeting_id }}">
+<label>Household name<input name="name" value="{{ profile.name if profile else '' }}" maxlength="60" required></label>
+{% if profile %}<fieldset class="member-choices"><legend>Existing people (names can be corrected; identities and history are kept)</legend>{% for m in profile.members %}<label>{{ loop.index }}. Name<input name="member_{{ m.id }}" value="{{ m.name }}" maxlength="40" required></label>{% endfor %}</fieldset>{% endif %}
+<label>{{ 'Add people' if profile else 'People in this household' }}<textarea name="new_people" rows="3" placeholder="Alex, Sam, Taylor" {% if not profile %}required{% endif %}></textarea></label>
+<p class="subtle">Separate names with commas or new lines. Up to 20 people. People added here are included by All going.</p>
+<button class="rsvp-choice" name="action" value="profile" {% if not available %}disabled{% endif %}>Save household only</button>
+{% if meeting_id %}
+{% if profile %}<fieldset class="member-choices"><legend>People going</legend>{% for m in profile.members %}<label class="member-choice"><input type="checkbox" name="attending" value="{{ m.id }}" {% if m.id in selected_ids %}checked{% endif %}>{{ m.name }}</label>{% endfor %}</fieldset>
+<button class="rsvp-choice" name="action" value="custom" {% if not available %}disabled{% endif %}>Save selected people</button>{% endif %}
+<div class="rsvp-actions"><button class="rsvp-choice" name="action" value="all" {% if not available %}disabled{% endif %}>All going</button><button class="rsvp-choice" name="action" value="none" {% if not available %}disabled{% endif %}>Not going</button></div>
+{% if profile %}<button class="text-button" name="action" value="clear" {% if not available %}disabled{% endif %}>Clear this response</button>{% endif %}
+{% endif %}
+</form>
+<p>Use an existing household to avoid duplicates. Members can choose their own household on the schedule and remember it on their browser. Existing remembered households appear here too.</p>
+{% endblock %}

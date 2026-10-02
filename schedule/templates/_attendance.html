@@ -3,6 +3,14 @@
 <section class="rsvp-panel" data-meeting="{{ key }}" aria-label="Household attendance">
   {% if sync_pending and summary.own is not none %}<p class="rsvp-hint" role="status">Saved on this server; Google sync is pending.</p>{% endif %}
   {% if can_respond(meeting) %}
+  {% if not household and household_choices %}
+  <form class="household-picker admin-form" action="{{ url_for('select_household') }}" method="post">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Already in the group?<select name="household_id" required><option value="">Choose your household</option>{% for h in household_choices %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}</select></label>
+    <button class="rsvp-choice">Use this household</button>
+    <p class="rsvp-hint">Choose only your own household. Attendance is shared within the group.</p>
+  </form>
+  {% endif %}
   <form class="rsvp-form" action="{{ url_for('save_attendance', meeting_id=key) }}" method="post">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     {% if household %}
@@ -19,12 +27,12 @@
       </fieldset>
       <p class="rsvp-hint">{% if summary.own is none %}Not sent yet. Everyone starts selected.{% else %}Saved. Tap a name to change who’s coming.{% endif %}</p>
     {% else %}
-      <p class="rsvp-title">Is your household coming?</p>
+      <p class="rsvp-title">New household or visiting guest?</p>
       <div class="household-setup">
-        <label>Your household<input name="household" autocomplete="off" maxlength="60" placeholder="e.g. The Riveras" required></label>
-        <label>People in your household<input name="people" autocomplete="off" maxlength="1000" placeholder="e.g. Alex, Sam, Kai" required></label>
+        <label>Household name (optional)<input name="household" autocomplete="off" maxlength="60" placeholder="e.g. The Riveras"></label>
+        <label>Your name and anyone joining you<input name="people" autocomplete="off" maxlength="1000" placeholder="e.g. Alex, Sam, Kai" required></label>
       </div>
-      <p class="rsvp-hint">Enter names once. This browser remembers your household.</p>
+      <p class="rsvp-hint">Guests are welcome. Enter names once; this browser remembers them.</p>
     {% endif %}
     <div class="rsvp-actions">
       <button name="action" value="all" class="rsvp-choice" aria-pressed="{{ 'true' if household and summary.own is not none and summary.own|length == household.members|length else 'false' }}"><span aria-hidden="true">✓</span> All going</button>

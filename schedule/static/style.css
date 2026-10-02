@@ -131,3 +131,7 @@ footer { font-size: .75rem; color: var(--muted); line-height: 1.8; border-top: 1
 .remember-help { margin: 6px 0 0; font-size: .85rem; color: var(--muted); }
 
 .group-login { width: calc(100% - 32px); margin: 24px auto; }
+
+.household-picker { margin-bottom: 18px; gap: 10px; }
+.admin-form .member-choice { display: flex; }
+.admin-form .member-choice input { width: 20px; min-height: 20px; padding: 0; }
