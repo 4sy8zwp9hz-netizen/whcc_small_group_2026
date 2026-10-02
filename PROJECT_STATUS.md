@@ -579,3 +579,7 @@ CSRF, revision/conflict checks, strict persistence and error behavior are retain
 checks at 375/1440 verified default checkbox, hiding past cards, all fields visible,
 inline location save/persistence and no horizontal overflow. No live Google or
 cloud changes performed. Redeployment is required to expose these changes.
+
+## Household example wording correction (2026-10-02)
+Pluralized the requested household placeholder in both member/admin forms.
+Render and whitespace checks passed; no saved household or live Sheet data changed.
