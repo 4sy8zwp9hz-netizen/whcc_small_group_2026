@@ -12,12 +12,19 @@
 {% if sync.last_sync %}<p class="subtle">Last successful backend sync: {{ sync.last_sync }}</p>{% endif %}
 <form action="{{ url_for('admin_sync') }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="rsvp-choice">Refresh calendar and retry sync</button></form></section>
 {% if sync.enabled and (stale or sync.error) %}<p><a class="edit-link" href="{{ url_for('admin_recovery') }}">Check backend and recover incomplete rows</a></p>{% endif %}
+<form class="admin-filter" action="{{ url_for('admin_index') }}" method="get">
+<input type="hidden" name="past_filter" value="1">
+<label class="member-choice"><input type="checkbox" name="show_past" value="true" {% if show_past %}checked{% endif %}>Show past events</label>
+<button class="rsvp-choice">Apply filter</button>
+</form>
 <div class="meeting-grid">
 {% for record in records %}<article class="meeting">
 <p class="eyebrow">{{ record["values"].date }} · {{ record["values"].time }} Central</p>
 <h3>{{ record["values"].topic or 'Small group gathering' }}</h3>
-<p>{{ record["values"].status|capitalize }}</p>
+<p>{{ record["values"].status|capitalize }}{% if record.id in past_ids %} &middot; Past event{% endif %}</p>
 {% if record.conflicts %}<p class="notice">{{ record.conflicts|length }} calendar change(s) need review.</p>{% endif %}
-<a class="edit-link" href="{{ url_for('admin_edit', key=record.id) }}">Edit meeting{% if record.conflicts %} and review conflicts{% endif %}</a>
-</article>{% else %}<p>No meetings are available to edit.</p>{% endfor %}
+{% with values=record["values"], error="", version_conflict=false, inline_edit=true %}
+{% include "_admin_meeting_form.html" %}
+{% endwith %}
+</article>{% else %}<p>No meetings match this filter.</p>{% endfor %}
 </div>{% endblock %}

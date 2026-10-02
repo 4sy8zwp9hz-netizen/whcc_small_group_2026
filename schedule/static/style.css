@@ -151,3 +151,6 @@ footer { font-size: .75rem; color: var(--muted); line-height: 1.8; border-top: 1
 .guest-setup[open] > summary::before { transform: rotate(90deg); }
 .guest-setup > summary:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
 .guest-setup .rsvp-form { padding-top: 8px; }
+
+.admin-filter { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 20px; }
+.admin-filter .member-choice { border: 0; padding-left: 0; }

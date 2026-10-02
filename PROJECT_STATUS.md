@@ -567,3 +567,15 @@ Cloud Run needs redeployment to expose this update.
 
 Login throttling uses a separate stable browser identity so household back/selection
 does not reset failed group/admin login allowances; regression coverage added.
+
+## Full admin cards and past-event filter (2026-10-02)
+Show past events is checked by default; the GET filter hides passed start times
+when unchecked. Classification uses America/Chicago meeting times, including
+canceled meetings; a meeting starting now remains included. Each card exposes all
+11 editable fields using a shared partial with the standalone editor. Blank
+required assignments are marked and optional fields are identified. Existing
+CSRF, revision/conflict checks, strict persistence and error behavior are retained.
+214 tests passed, compilation and whitespace checks passed. Fictional browser
+checks at 375/1440 verified default checkbox, hiding past cards, all fields visible,
+inline location save/persistence and no horizontal overflow. No live Google or
+cloud changes performed. Redeployment is required to expose these changes.

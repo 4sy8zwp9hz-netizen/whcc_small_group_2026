@@ -4,22 +4,5 @@
 <p>All times are Central. Saving updates the app backend. Production saves must be confirmed in Google Sheets.</p>
 {% if error %}<p class="notice" role="alert">{{ error }} <a href="{{ url_for('admin_edit', key=record.id) }}">Reload latest values</a></p>{% endif %}
 {% if stale %}<p class="notice">{% if editing_available %}The original calendar could not refresh. You can edit the verified saved backend; calendar changes will be checked when refresh resumes.{% else %}The saved schedule could not be verified. Reload before saving.{% endif %}</p>{% endif %}
-<form method="post" class="admin-form"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="revision" value="{{ record.revision }}">
-{% if record.conflicts %}<section class="notice"><h3>Review calendar changes</h3><p>Both the app and original calendar changed. Choose which values to use.</p>
-{% for field, incoming in record.conflicts.items() %}
-{% if field == '_removed' %}
-<p>{{ incoming }}</p><label>Removed calendar entry<select name="resolve_{{ field }}" required><option value="">Choose an action</option><option value="keep">Keep this app meeting</option><option value="cancel">Cancel this app meeting</option></select></label>
-{% else %}<div class="conflict"><strong>{{ field|replace('_', ' ')|capitalize }}</strong>
-<p>Previous calendar value: {{ record.base[field] }}</p><p>Current calendar value: {{ incoming }}</p><p>App value: {{ record["values"][field] }}</p>
-<label>Use which value?<select name="resolve_{{ field }}" required><option value="">Choose a value</option><option value="app">Use the app form below</option><option value="calendar">Use the current calendar value</option></select></label></div>{% endif %}
-{% endfor %}</section>{% endif %}
-<div class="admin-fields">
-{% for field in fields %}
-{% if field == 'special_event' %}<label>Meeting type<select name="special_event"><option value="false" {% if not values[field] %}selected{% endif %}>Regular gathering</option><option value="true" {% if values[field] %}selected{% endif %}>Special event / off week</option></select></label>
-{% elif field == 'status' %}<label>Status<select name="status"><option value="scheduled" {% if values[field] == 'scheduled' %}selected{% endif %}>Scheduled</option><option value="canceled" {% if values[field] in ['canceled','cancelled'] %}selected{% endif %}>Canceled / no meeting</option></select></label>
-{% elif field == 'notes' %}<label class="wide">Notes<textarea name="notes" rows="4" maxlength="2000">{{ values[field] }}</textarea></label>
-{% else %}<label>{{ field|replace('_',' ')|capitalize }}<input name="{{ field }}" type="{{ field if field in ['date','time'] else 'text' }}" value="{{ values[field] }}" maxlength="300" {% if field in ['date','time'] %}required{% endif %}></label>{% endif %}
-{% endfor %}
-</div><button class="rsvp-choice" {% if not editing_available or version_conflict %}disabled{% endif %}>Save changes</button>
-<a href="{{ url_for('admin_index') }}">Cancel editing</a></form></section>
+{% include '_admin_meeting_form.html' %}</section>
 {% endblock %}

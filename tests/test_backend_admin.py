@@ -389,3 +389,40 @@ def local_path():
         path = Path(folder).resolve()
         assert path.parent == cache
         yield path
+
+def test_admin_past_filter_defaults_checked_and_uses_meeting_start_in_chicago():
+    source = Source()
+    source.rows += [{"date": "2026-09-01", "time": "18:00", "topic": "Past fictional meeting"},
+                    {"date": "2026-09-02", "time": "18:00", "topic": "Past canceled meeting", "status": "canceled"},
+                    {"date": "2026-10-01", "time": "12:00", "topic": "Starting now"}]
+    app, _, backend = make(source=source)
+    client = app.test_client()
+    login(client)
+    page = client.get("/admin").text
+    assert 'name="show_past" value="true" checked' in page
+    assert page.count('action="/admin/meetings/') == 4
+    assert "Past event" in page and "Past fictional meeting" in page
+    hidden = client.get("/admin?past_filter=1").text
+    assert "Past fictional meeting" not in hidden and "Past canceled meeting" not in hidden
+    assert "Starting now" in hidden and hidden.count('action="/admin/meetings/') == 2
+    restored = client.get("/admin?past_filter=1&show_past=true").text
+    assert restored.count('action="/admin/meetings/') == 4
+
+
+def test_admin_cards_show_all_editable_fields_and_keep_protected_save_behavior():
+    from schedule.backend import EDIT_FIELDS
+    app, source, backend = make()
+    client = app.test_client()
+    csrf = login(client)
+    page = client.get("/admin").text
+    for field in EDIT_FIELDS:
+        assert 'name="' + field + '"' in page
+    assert page.count("Needs assignment</span>") == 3  # Existing host is populated.
+    assert 'name="location"' in page and 'placeholder="Optional"' in page
+    record = backend.records()[0]
+    url = "/admin/meetings/" + record["id"]
+    assert client.post(url, data=form(record, "bad", location="Fictional room")).status_code == 400
+    assert client.post(url, data=form(record, csrf, location="Fictional room")).status_code == 303
+    assert 'value="Fictional room"' in client.get("/admin").text
+    assert not source.rows[0].get("location")
+    assert client.post(url, data=form(record, csrf, location="Stale room")).status_code == 409

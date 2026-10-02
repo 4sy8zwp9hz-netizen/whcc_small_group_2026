@@ -833,3 +833,9 @@ local demo mode and pending development sync are labeled separately.
 access and saved attendance. Choose another household or expand **New household or
 visiting guest?** using its caret. Guest setup is collapsed by default and works
 without JavaScript.
+
+Admin home shows **Show past events** checked by default. Uncheck it and apply the
+filter to show only meetings whose Central start time has not passed. Each card
+contains every editable schedule field and its own Save changes button. Required
+blank assignments are labeled; optional blanks remain optional. Both card and
+standalone edits use the same form and protected save route.

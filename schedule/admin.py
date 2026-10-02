@@ -32,7 +32,9 @@ def install_admin(app, root, backend, attendance):
                     and session.get("admin_credential") == hashlib.sha256(configured.encode()).hexdigest())
 
     def page(template, **context):
-        return render_template(template, csrf=csrf(), logged_in=signed_in(), **context)
+        return render_template(template, csrf=csrf(), logged_in=signed_in(),
+                               required_assignments={f.strip() for f in app.config["REQUIRED_ASSIGNMENTS"].split(",") if f.strip()},
+                               **context)
 
     from .admin_households import install_households
     install_households(app, backend, attendance, signed_in, page)
@@ -75,7 +77,13 @@ def install_admin(app, root, backend, attendance):
         if not signed_in():
             return redirect(url_for("admin_login"))
         snapshot = backend.cache.get()
-        return page("admin_index.html", records=backend.records(), sync=backend.status(), stale=snapshot.stale)
+        show_past = request.args.get("past_filter") != "1" or request.args.get("show_past") == "true"
+        meetings = {m.record_id: m for m in backend.cache.parser(backend.rows())}
+        past_ids = {key for key, meeting in meetings.items() if meeting.starts_at < attendance.now()}
+        records = [r for r in backend.records() if show_past or r["id"] not in past_ids]
+        return page("admin_index.html", records=records, sync=backend.status(), stale=snapshot.stale,
+                    show_past=show_past, past_ids=past_ids, fields=EDIT_FIELDS,
+                    editing_available=not snapshot.stale or (backend.strict and backend.attendance_available))
 
     @app.route("/admin/meetings/<key>", methods=["GET", "POST"])
     def admin_edit(key):
