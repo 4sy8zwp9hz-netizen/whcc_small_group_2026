@@ -171,3 +171,5 @@ footer { font-size: .75rem; color: var(--muted); line-height: 1.8; border-top: 1
 .assignment-options { padding: 10px; display: grid; gap: 8px; max-height: 320px; overflow-y: auto; }
 .assignment-options .member-choice { font-size: .85rem; }
 .assignment-options [hidden] { display: none; }
+
+.own-assignment { background: var(--accent); color: var(--ink); border-radius: 5px; padding: 2px 4px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }

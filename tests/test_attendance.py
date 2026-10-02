@@ -281,3 +281,37 @@ def test_storage_failure_does_not_report_saved():
         response = submit(client, key, csrf)
     assert response.status_code == 503
     assert "could not be saved" in response.json["error"]
+
+
+def test_assignment_highlights_match_whole_names_and_keep_text():
+    from schedule.attendance import assignment_parts
+    household = {'name':'Example family', 'members':[{'name':'Alex Example'}, {'name':'Sam Example'}]}
+    value = 'Alexa / Alex, Sam Example & Visitor'
+    parts = assignment_parts('discussion_leader', value, household)
+    assert ''.join(text for text, _ in parts) == value
+    assert [text for text, own in parts if own] == ['Alex', 'Sam Example']
+    assert assignment_parts('host', 'Example family', household) == [('Example family', True)]
+    assert assignment_parts('food', 'Other family', household) == [('Other family', False)]
+    assert not any(own for _, own in assignment_parts('notes', 'Alex', household))
+    assert not any(own for _, own in assignment_parts('childcare', 'Alex', None))
+
+
+def test_assignment_highlights_follow_cookie_and_remain_escaped():
+    source = Source()
+    source.rows[0].update({'discussion_leader':'Alex / Visitor', 'host':'Example family', 'food':'Other family'})
+    source.rows[1].update({'childcare':'Sam', 'discussion_leader':'<script>alert(1)</script>'})
+    source.rows.append({'date':'2026-09-01','time':'18:00','discussion_leader':'Alex'})
+    app = make_app(source)
+    client = app.test_client()
+    key, csrf, _ = setup(client)
+    assert '<mark class="own-assignment">' not in client.get('/').text
+    assert submit(client,key,csrf).status_code == 200
+    for _ in range(2):
+        page = client.get('/').text
+        assert '<mark class="own-assignment">Alex</mark> / Visitor' in page
+        assert '<mark class="own-assignment">Sam</mark>' in page
+        assert '<mark class="own-assignment">Example family</mark>' in page
+        assert '<script>alert(1)</script>' not in page and '&lt;script&gt;' in page
+    assert '<mark class="own-assignment">' not in client.get('/past').text
+    assert client.post('/household/back',data={'csrf':csrf}).status_code == 303
+    assert '<mark class="own-assignment">' not in client.get('/').text

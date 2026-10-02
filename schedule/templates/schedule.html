@@ -38,7 +38,7 @@
       {% for field, label in labels.items() %}
         {% set value = meeting|attr(field) %}
         {% if value or (not meeting.canceled and not meeting.special_event and field in required) %}
-        <div><dt>{{ label }}{{ ' (previously planned)' if meeting.canceled else '' }}</dt><dd>{% if value %}{{ value }}{% else %}<span class="missing">Needs assignment</span>{% endif %}</dd></div>
+        <div><dt>{{ label }}{{ ' (previously planned)' if meeting.canceled else '' }}</dt><dd>{% if value %}{% if not past and not meeting.canceled %}{% for text, own in assignment_parts(field, value) %}{% if own %}<mark class="own-assignment">{{ text }}</mark>{% else %}{{ text }}{% endif %}{% endfor %}{% else %}{{ value }}{% endif %}{% else %}<span class="missing">Needs assignment</span>{% endif %}</dd></div>
         {% endif %}
       {% endfor %}
     </dl>

@@ -869,3 +869,10 @@ In household setup, enter full member names or the optional **Family last name**
 this appends that surname only to single-word names, preserving identities/history.
 It never guesses a surname from a household title. Same first names can appear
 in saved assignments; full names/households disambiguate choices in the editor.
+
+Upcoming assignment names are highlighted for the remembered household: discussion
+leader/childcare match complete first or full member names; host/food match the
+household name. Matching ignores case and repeated whitespace, preserving displayed
+text and separators. Past/canceled assignments are not highlighted. Short names may
+match multiple households; full names avoid that ambiguity. Highlighting changes no
+assignment or attendance data.

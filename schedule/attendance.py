@@ -10,6 +10,20 @@ import threading
 from flask import jsonify, redirect, render_template, request, session, url_for
 
 
+def assignment_parts(field, value, household):
+    """Match complete assignment names, keeping separators and text unchanged."""
+    normalize = lambda text: " ".join(text.split()).casefold()
+    names = set()
+    if household and field in {"discussion_leader", "childcare", "host", "food"}:
+        if field in {"host", "food"}:
+            names.add(normalize(household["name"]))
+        else:
+            for member in household["members"]:
+                names.update((normalize(member["name"]), normalize(member["name"].split()[0])))
+    parts = re.split(r"(\s*[/,;&]\s*|\s+and\s+)", value, flags=re.IGNORECASE)
+    return [(part, index % 2 == 0 and normalize(part) in names) for index, part in enumerate(parts) if part]
+
+
 def clean_name(value, limit=60):
     value = " ".join(value.split())
     if not value or len(value) > limit or any(ord(c) < 32 for c in value):
@@ -213,6 +227,7 @@ class Attendance:
             "household_choices": self.roster() if household is None else [],
             "attendance": self.store.summaries(keys, visitor),
             "attendance_key": self.key,
+            "assignment_parts": lambda field, value: assignment_parts(field, value, household),
             "can_respond": lambda meeting: self.allowed(meeting, snapshot),
             "attendance_unavailable_reason": lambda meeting: self.unavailable_reason(meeting, snapshot),
         }

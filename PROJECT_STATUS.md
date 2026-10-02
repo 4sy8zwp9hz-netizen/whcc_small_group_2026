@@ -638,3 +638,16 @@ blank household preselection bug fixed and rechecked (food saves correctly).
 No live Sheet/cloud changes, no secrets changed. Cloud Run redeploy required.
 Changes ready for reviewed commit/push to existing personal main. If interrupted,
 inspect Git status/HEAD/origin before publishing; preserve all work.
+
+## Remembered-household assignment highlights (2026-10-02)
+Upcoming/featured assignment values highlight matching whole member first/full names
+for discussion leader/childcare and exact household names for host/food. Slash,
+comma, semicolon, ampersand and and-separated text is preserved and autoescaped.
+No highlighting for past/canceled entries, notes, unrelated names or no selection.
+222 tests passed; compilation/whitespace checks passed. Fictional browser selection
+and reload kept matching highlights; upcoming/past at 375/1440 had no overflow.
+Existing cookie tests pass: persistent 365-day household session, 24-hour default or
+fixed 30-day remembered group access, independent 30-minute admin access. Group
+logout/expiry preserves household identity; cookies are browser/hostname specific
+and rely on stable signing keys. Live Cloud Run cookie not inspected this turn.
+No live Sheet/cloud changes; pull and redeploy to show this display update.
