@@ -14,7 +14,6 @@
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label>Already in the group?<select name="household_id" required><option value="">Choose your household</option>{% for h in household_choices %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}</select></label>
     <button class="rsvp-choice">Use this household</button>
-    <p class="rsvp-hint">Choose only your own household. Attendance is shared within the group.</p>
   </form>
   {% endif %}
   {% if not household %}<details class="guest-setup"><summary>New household or visiting guest?</summary>{% endif %}

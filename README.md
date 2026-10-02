@@ -848,3 +848,8 @@ Not going and individual attendance controls.
 Later upcoming cards keep attendance inside a collapsed **Can you make it?**
 section. Expand it to plan attendance. The featured card keeps its attendance
 controls visible. Assignment sections retain their expanded upcoming default.
+
+The remembered household is highlighted beside **Can you make it?** on upcoming
+cards, including while collapsed. Selected people are highlighted inside the form.
+This identifies the browser's household; it does not submit a response for future
+meetings. Unsent selections are still labeled Not sent yet.

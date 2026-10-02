@@ -608,3 +608,13 @@ AJAX replaces only the panel inside the disclosure, keeping it open after saves.
 checks at 375/1440 verified expanded form, one-tap future selection, unchanged
 this-week response, persisted plans after reload and no horizontal overflow.
 No live Sheet/cloud changes; redeployment is required for this display update.
+
+## Compact remembered-household highlights (2026-10-02)
+Removed the household-picker instruction at the owner's request. Future card
+summaries show the browser's remembered household in a highlighted badge; checked
+member choices are highlighted inside forms. No attendance is submitted by selection
+or highlighting. Existing cookie/auth/CSRF and explicit-save behavior is unchanged.
+217 tests passed, compilation and whitespace checks passed. Fictional browser
+checks verified household selection, remembered badge after reload, checked-name
+highlight styling, and no overflow on upcoming/past at 375/1440 widths.
+No live Sheet/cloud changes. Redeploy to expose this interface update.

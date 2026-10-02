@@ -27,7 +27,7 @@
   {% if not meeting.canceled %}
     {% if not featured and not past %}
     <details class="planned-attendance">
-      <summary>Can you make it?</summary>
+      <summary>Can you make it?{% if household %} <span class="remembered-household">{{ household.name }}</span>{% endif %}</summary>
       {% include "_attendance.html" %}
     </details>
     {% else %}{% include "_attendance.html" %}{% endif %}

@@ -283,3 +283,27 @@ def test_later_meeting_plans_are_separate_from_this_weeks_response():
     assert len(replies['2026-10-09'][0]['attending']) == 2
     page = client.get('/').text
     assert 'Can you make it?' in page and 'All going' in page
+
+
+def test_upcoming_highlight_follows_remembered_household_without_submitting_plans():
+    from test_backend_admin import Source
+    source = Source()
+    source.rows.append({'date': '2026-10-09', 'time': '18:00', 'topic': 'Future fictional gathering'})
+    app, _, backend, publisher = seed(source=source)
+    client = app.test_client()
+    login(client)
+    assert create(client).status_code == 303
+    hid = identity(publisher)
+    page = client.get('/').text
+    assert 'Choose only your own household.' not in page
+    assert 'remembered-household' not in page
+    with client.session_transaction() as session:
+        csrf = session['csrf']
+    assert client.post('/household/select', data={'csrf': csrf, 'household_id': hid}).status_code == 303
+    for _ in range(2):
+        page = client.get('/').text
+        assert '<span class="remembered-household">Fictional family</span>' in page
+        assert 'Not sent yet. Everyone starts selected.' in page
+    assert all(not item['responses'] for item in publisher.remote)
+    assert client.post('/household/back', data={'csrf': csrf}).status_code == 303
+    assert 'remembered-household' not in client.get('/').text

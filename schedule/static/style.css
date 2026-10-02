@@ -162,3 +162,6 @@ footer { font-size: .75rem; color: var(--muted); line-height: 1.8; border-top: 1
   min-height: 44px; padding: 12px 0; font-size: .94rem; font-weight: 700; cursor: pointer;
 }
 .planned-attendance .rsvp-panel { border-top: 0; padding-top: 4px; }
+
+.remembered-household { display: inline-block; background: var(--accent); color: var(--ink); border-radius: 6px; padding: 2px 7px; font-size: .8rem; max-width: 100%; }
+.rsvp-form .member-choice:has(input:checked) { background: var(--accent); color: var(--ink); border-color: #688635; }
