@@ -243,3 +243,21 @@ def test_back_does_not_reset_browser_admin_login_throttle():
         assert client.post('/admin/login', data={'csrf': csrf, 'password': 'wrong'}).status_code == 401
     assert client.post('/household/back', data={'csrf': csrf}).status_code == 303
     assert client.post('/admin/login', data={'csrf': csrf, 'password': 'wrong'}).status_code == 429
+
+
+
+def test_guest_submit_marks_all_entered_people_going_and_restores_member_controls():
+    app, _, backend, publisher = seed()
+    client = app.test_client()
+    page = client.get('/').text
+    assert '<button name="action" value="all" class="rsvp-choice">Submit</button>' in page
+    assert 'All going' not in page and 'Not going' not in page
+    with client.session_transaction() as session:
+        csrf = session['csrf']
+    key = backend.records()[0]['id']
+    response = client.post('/attendance/' + key, data={'csrf': csrf, 'action': 'all', 'people': 'Visitor, Friend'})
+    assert response.status_code == 303
+    assert len(publisher.remote[0]['responses'][0]['attending']) == 2
+    page = client.get('/').text
+    assert 'All going' in page and 'Not going' in page
+    assert '>Submit</button>' not in page

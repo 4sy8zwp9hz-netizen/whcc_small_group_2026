@@ -154,3 +154,5 @@ footer { font-size: .75rem; color: var(--muted); line-height: 1.8; border-top: 1
 
 .admin-filter { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 20px; }
 .admin-filter .member-choice { border: 0; padding-left: 0; }
+
+.guest-setup .rsvp-choice { width: 100%; }

@@ -583,3 +583,11 @@ cloud changes performed. Redeployment is required to expose these changes.
 ## Household example wording correction (2026-10-02)
 Pluralized the requested household placeholder in both member/admin forms.
 Render and whitespace checks passed; no saved household or live Sheet data changed.
+
+## Single guest/new-household Submit (2026-10-02)
+Guest/new-household setup now has one Submit button using the existing all-going
+action. All entered people are marked going; existing remembered households retain
+all/none and individual controls. Native and JavaScript submissions remain supported.
+215 tests passed, compilation and whitespace checks passed. Fictional browser Submit
+confirmed both entered people, remembered identity and response persistence on reload.
+No live Sheet/cloud changes. Redeployment is required to show the new button.

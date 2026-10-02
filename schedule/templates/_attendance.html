@@ -38,12 +38,16 @@
         <label>Household name (optional)<input name="household" autocomplete="off" maxlength="60" placeholder="e.g. The Chungs"></label>
         <label>Your name and anyone joining you<input name="people" autocomplete="off" maxlength="1000" placeholder="e.g. Matt, Diana, Meowi, Zane" required></label>
       </div>
-      <p class="rsvp-hint">Guests are welcome. Enter names once; this browser remembers them.</p>
+      <p class="rsvp-hint">Guests are welcome. Submit marks everyone listed as going, and this browser remembers your names.</p>
     {% endif %}
+    {% if household %}
     <div class="rsvp-actions">
       <button name="action" value="all" class="rsvp-choice" aria-pressed="{{ 'true' if household and summary.own is not none and summary.own|length == household.members|length else 'false' }}"><span aria-hidden="true">✓</span> All going</button>
       <button name="action" value="none" class="rsvp-choice" aria-pressed="{{ 'true' if summary.own == [] else 'false' }}"><span aria-hidden="true">×</span> Not going</button>
     </div>
+    {% else %}
+    <button name="action" value="all" class="rsvp-choice">Submit</button>
+    {% endif %}
     {% if household %}
     <div class="rsvp-secondary">
       <button name="action" value="custom" class="manual-save text-button">Save selection</button>

@@ -839,3 +839,7 @@ filter to show only meetings whose Central start time has not passed. Each card
 contains every editable schedule field and its own Save changes button. Required
 blank assignments are labeled; optional blanks remain optional. Both card and
 standalone edits use the same form and protected save route.
+
+New households and guests use a single **Submit** button, marking all entered
+people as going. After setup, the remembered household has the usual All going,
+Not going and individual attendance controls.

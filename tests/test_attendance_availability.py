@@ -26,7 +26,7 @@ def test_cold_calendar_outage_allows_durable_attendance_changes_and_clear():
     csrf = token(client)
     key = backend.records()[0]["id"]
     page = client.get("/").text
-    assert "Attendance is available" in page and "All going" in page
+    assert "Attendance is available" in page and ">Submit</button>" in page
     assert "Attendance is closed for past meetings, or unavailable" not in page
     data = {"csrf":csrf,"action":"all","household":"Fictional family","people":"Alex, Sam"}
     response = client.post("/attendance/"+key,data=data,headers={"Accept":"application/json"})
@@ -64,7 +64,7 @@ def test_backend_failure_still_refuses_and_never_claims_saved():
         response=client.post("/attendance/"+key,data={"csrf":csrf,"action":"all","household":"Fictional","people":"Alex"})
     assert response.status_code != 200 and not backend.attendance_available
     assert not publisher.remote[0]["responses"]
-    assert "All going" not in client.get("/").text
+    assert ">Submit</button>" not in client.get("/").text
 
 
 def test_failed_append_during_calendar_outage_rolls_back_response():
