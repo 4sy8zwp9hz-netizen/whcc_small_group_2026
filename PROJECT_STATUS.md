@@ -548,3 +548,9 @@ and 375/1440 layouts without horizontal overflow. Real Sheets was only read; no 
 households were created there. Cloud Run must be redeployed to expose these forms.
 Docker/gcloud are unavailable locally; this revision's container/live write checks
 remain outstanding. Prior user-reported container checks predate this revision.
+
+## Requested form examples (2026-10-02)
+Updated member/admin placeholders to the owner-requested household and people
+examples. These are hints only; no profiles, attendance or live Sheet data are
+created. Fictional tests/fixtures remain unchanged. Render and whitespace checks
+passed. Cloud Run needs redeployment for the updated placeholders.

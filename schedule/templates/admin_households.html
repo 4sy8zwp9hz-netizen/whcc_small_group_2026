@@ -13,9 +13,9 @@
 <form method="post" class="admin-form meeting">
 <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="token" value="{{ token }}">
 <input type="hidden" name="household_id" value="{{ selected }}"><input type="hidden" name="meeting_id" value="{{ meeting_id }}">
-<label>Household name<input name="name" value="{{ profile.name if profile else '' }}" maxlength="60" required></label>
+<label>Household name<input name="name" value="{{ profile.name if profile else '' }}" placeholder="The Chung" maxlength="60" required></label>
 {% if profile %}<fieldset class="member-choices"><legend>Existing people (names can be corrected; identities and history are kept)</legend>{% for m in profile.members %}<label>{{ loop.index }}. Name<input name="member_{{ m.id }}" value="{{ m.name }}" maxlength="40" required></label>{% endfor %}</fieldset>{% endif %}
-<label>{{ 'Add people' if profile else 'People in this household' }}<textarea name="new_people" rows="3" placeholder="Alex, Sam, Taylor" {% if not profile %}required{% endif %}></textarea></label>
+<label>{{ 'Add people' if profile else 'People in this household' }}<textarea name="new_people" rows="3" placeholder="Matt, Diana, Meowi, Zane" {% if not profile %}required{% endif %}></textarea></label>
 <p class="subtle">Separate names with commas or new lines. Up to 20 people. People added here are included by All going.</p>
 <button class="rsvp-choice" name="action" value="profile" {% if not available %}disabled{% endif %}>Save household only</button>
 {% if meeting_id %}
