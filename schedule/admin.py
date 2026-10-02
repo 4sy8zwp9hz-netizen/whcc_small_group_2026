@@ -45,7 +45,7 @@ def install_admin(app, root, backend, attendance):
         if request.method == "POST":
             if not attendance.csrf_valid():
                 abort(400)
-            identity = attendance.visitor()
+            identity = attendance.login_identity()
             if limiter.blocked(identity):
                 error, code = "Too many attempts. Try again in five minutes.", 429
             else:

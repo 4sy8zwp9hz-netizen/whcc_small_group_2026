@@ -828,3 +828,8 @@ may be old. The app replays accepted updates to show current schedule/attendance
 Do not manually edit, sort or delete these rows. The original calendar stays
 read-only to the app. The admin sync status reports confirmed Sheets persistence;
 local demo mode and pending development sync are labeled separately.
+
+**Back to household selection** changes only this browser selection, keeping group/admin
+access and saved attendance. Choose another household or expand **New household or
+visiting guest?** using its caret. Guest setup is collapsed by default and works
+without JavaScript.

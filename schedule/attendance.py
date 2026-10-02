@@ -158,6 +158,7 @@ class Attendance:
             source = str((root / app.config["CSV_PATH"]).resolve())
         self.namespace = app.config["DATA_SOURCE"] + "\0" + source
         app.add_url_rule("/attendance/<meeting_id>", "save_attendance", self.save, methods=["POST"])
+        app.add_url_rule("/household/back", "back_to_households", self.back_to_households, methods=["POST"])
         app.add_url_rule("/household/select", "select_household", self.select_household, methods=["POST"])
         app.add_url_rule("/household/forget", "forget_household", self.forget, methods=["POST"])
 
@@ -174,6 +175,13 @@ class Attendance:
             session["csrf"] = secrets.token_urlsafe(32)
             session.permanent = True
         return session["household_id"]
+
+    def login_identity(self):
+        # Household selection must not reset this browser's failed-login allowance.
+        self.visitor()
+        if "login_browser_id" not in session:
+            session["login_browser_id"] = secrets.token_urlsafe(32)
+        return session["login_browser_id"]
 
     def schedule_usable(self, snapshot):
         backend = self.app.extensions.get("backend")
@@ -274,6 +282,13 @@ class Attendance:
         }
         return jsonify(panels=panels, message=("Response cleared." if action == "clear" else "Attendance saved.")
                        + ("" if synced else " Saved locally; Google sync is pending."))
+
+    def back_to_households(self):
+        if not self.csrf_valid():
+            return self.error("Please reload the page and try again.", 400)
+        # Change only browser selection; retain group/admin access and saved replies.
+        session["household_id"] = secrets.token_urlsafe(32)
+        return redirect(url_for("upcoming"), code=303)
 
     def roster(self):
         with self.store.lock:

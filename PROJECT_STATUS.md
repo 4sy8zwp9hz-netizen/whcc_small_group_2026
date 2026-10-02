@@ -554,3 +554,16 @@ Updated member/admin placeholders to the owner-requested household and people
 examples. These are hints only; no profiles, attendance or live Sheet data are
 created. Fictional tests/fixtures remain unchanged. Render and whitespace checks
 passed. Cloud Run needs redeployment for the updated placeholders.
+
+## Household back navigation and collapsed guest setup (2026-10-02)
+Added a CSRF-protected Back to household selection action that changes only the
+browser household choice, preserving group/admin access, CSRF and stored profiles
+and attendance. Guest setup is a native details/summary section, initially collapsed,
+with a visible rotating caret and keyboard focus. No JavaScript dependency added.
+212 tests passed, compilation and whitespace checks passed. Fictional browser checks
+at 375/1440 verified collapsed/expanded setup, selected-household back navigation,
+preserved attendance and no horizontal overflow. No live Sheet/cloud changes.
+Cloud Run needs redeployment to expose this update.
+
+Login throttling uses a separate stable browser identity so household back/selection
+does not reset failed group/admin login allowances; regression coverage added.

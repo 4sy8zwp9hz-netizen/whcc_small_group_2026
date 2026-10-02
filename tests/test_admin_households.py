@@ -203,3 +203,43 @@ def test_invalid_roster_leaves_no_partial_data():
     for names in ["Alex, Alex", ",".join("Person" + str(i) for i in range(21)), "A" * 41]:
         assert client.post("/admin/households", data=form(client, new_people=names)).status_code == 400
         assert not backend.export()[0]["households"]
+
+
+
+def test_back_preserves_saved_household_responses_and_authorization():
+    app, _, backend, publisher = seed(GROUP_ACCESS_PASSWORD_HASH=HASH)
+    client = app.test_client()
+    group_login(client)
+    csrf = login(client)
+    key = backend.cache.get().meetings[0].record_id
+    assert client.post('/attendance/' + key, data={'csrf': csrf, 'action': 'all', 'people': 'Alex, Sam'}).status_code == 303
+    before = copy.deepcopy(publisher.remote)
+    with client.session_transaction() as session:
+        authorization = {k: v for k, v in session.items() if k != 'household_id'}
+        old_identity = session['household_id']
+    assert client.post('/household/back', data={'csrf': 'bad'}).status_code == 400
+    with client.session_transaction() as session:
+        assert session['household_id'] == old_identity
+    assert client.post('/household/back', data={'csrf': csrf}).status_code == 303
+    assert publisher.remote == before
+    with client.session_transaction() as session:
+        assert session['household_id'] != old_identity
+        assert {k: v for k, v in session.items() if k != 'household_id'} == authorization
+    assert client.get('/admin').status_code == 200
+    page = client.get('/').text
+    assert 'Choose your household' in page
+    assert '<details class="guest-setup">' in page and '<details class="guest-setup" open' not in page
+    assert app.extensions['attendance'].store.household(old_identity) is not None
+    assert client.post('/household/select', data={'csrf': csrf, 'household_id': identity(publisher)}).status_code == 303
+    assert 'Back to household selection' in client.get('/').text
+
+
+
+def test_back_does_not_reset_browser_admin_login_throttle():
+    app, _, _, _ = seed()
+    client = app.test_client()
+    csrf = login(client)
+    for _ in range(10):
+        assert client.post('/admin/login', data={'csrf': csrf, 'password': 'wrong'}).status_code == 401
+    assert client.post('/household/back', data={'csrf': csrf}).status_code == 303
+    assert client.post('/admin/login', data={'csrf': csrf, 'password': 'wrong'}).status_code == 429

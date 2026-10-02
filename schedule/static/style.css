@@ -135,3 +135,19 @@ footer { font-size: .75rem; color: var(--muted); line-height: 1.8; border-top: 1
 .household-picker { margin-bottom: 18px; gap: 10px; }
 .admin-form .member-choice { display: flex; }
 .admin-form .member-choice input { width: 20px; min-height: 20px; padding: 0; }
+
+.household-back { margin: 0 0 12px; }
+.household-back .text-button { min-height: 44px; font-size: .85rem; }
+.guest-setup > summary {
+  display: flex; align-items: center; gap: 10px; min-height: 44px;
+  padding: 10px 0; font-size: .94rem; font-weight: 700; cursor: pointer;
+  list-style: none;
+}
+.guest-setup > summary::-webkit-details-marker { display: none; }
+.guest-setup > summary::before {
+  content: ""; border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+  border-left: 7px solid currentColor; flex: 0 0 auto;
+}
+.guest-setup[open] > summary::before { transform: rotate(90deg); }
+.guest-setup > summary:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.guest-setup .rsvp-form { padding-top: 8px; }

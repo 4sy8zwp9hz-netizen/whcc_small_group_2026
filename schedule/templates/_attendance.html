@@ -2,6 +2,12 @@
 {% set summary = attendance[key] %}
 <section class="rsvp-panel" data-meeting="{{ key }}" aria-label="Household attendance">
   {% if sync_pending and summary.own is not none %}<p class="rsvp-hint" role="status">Saved on this server; Google sync is pending.</p>{% endif %}
+  {% if household %}
+  <form class="household-back" action="{{ url_for('back_to_households') }}" method="post">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="text-button"><span aria-hidden="true">&#8592;</span> Back to household selection</button>
+  </form>
+  {% endif %}
   {% if can_respond(meeting) %}
   {% if not household and household_choices %}
   <form class="household-picker admin-form" action="{{ url_for('select_household') }}" method="post">
@@ -11,6 +17,7 @@
     <p class="rsvp-hint">Choose only your own household. Attendance is shared within the group.</p>
   </form>
   {% endif %}
+  {% if not household %}<details class="guest-setup"><summary>New household or visiting guest?</summary>{% endif %}
   <form class="rsvp-form" action="{{ url_for('save_attendance', meeting_id=key) }}" method="post">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     {% if household %}
@@ -27,7 +34,6 @@
       </fieldset>
       <p class="rsvp-hint">{% if summary.own is none %}Not sent yet. Everyone starts selected.{% else %}Saved. Tap a name to change who’s coming.{% endif %}</p>
     {% else %}
-      <p class="rsvp-title">New household or visiting guest?</p>
       <div class="household-setup">
         <label>Household name (optional)<input name="household" autocomplete="off" maxlength="60" placeholder="e.g. The Chung"></label>
         <label>Your name and anyone joining you<input name="people" autocomplete="off" maxlength="1000" placeholder="e.g. Matt, Diana, Meowi, Zane" required></label>
@@ -46,6 +52,7 @@
     {% endif %}
     <p class="rsvp-error" role="alert"></p>
   </form>
+  {% if not household %}</details>{% endif %}
   {% elif not meeting.canceled %}
   <p class="rsvp-hint">{{ attendance_unavailable_reason(meeting) }}</p>
   {% endif %}
