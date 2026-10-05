@@ -661,3 +661,19 @@ food/host multi-assignment aliases and unchanged member highlights. 224 tests pa
 compilation and whitespace checks passed. Layout is unchanged from the previous
 375/1440 browser checks; no new visual check needed for the text matching fix.
 No live Sheet/cloud changes. Pull and redeploy to show the correction.
+
+## Personal attendance status and upcoming assignments (2026-10-05)
+Each selected-household meeting card shows its actual saved response outside the
+attendance disclosure: unanswered, everyone going, some going with names, or not
+going. Clear restores unanswered; default selected checkboxes do not imply a save.
+A collapsed Your upcoming assignments section follows the featured card, listing
+matching member/household responsibilities in date order with meeting links. Uses
+existing whole-name/leading-The matching; excludes past/canceled/conflicting entries.
+Assignments do not change when attendance changes. AJAX refreshes both views after
+confirmed responses, preserving the overview's open state. No new writes/schema,
+Google requests, credentials, or changes to authentication/durability safeguards.
+227 tests passed, including saved/partial/none/clear, matching/exclusions, empty/stale
+and escaping regressions. Compilation/whitespace checks passed. Fictional browser
+checks exercised setup, partial selection, future not-going/clear and persistence;
+375/1440 upcoming/past had no horizontal overflow. Featured status contrast corrected.
+No live Sheet/cloud changes. Pull and manually redeploy Cloud Run for this update.

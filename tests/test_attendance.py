@@ -341,3 +341,68 @@ def test_short_household_names_render_highlighted_for_food_and_host():
     assert page.count('<mark class="own-assignment">Examples</mark>') == 2
     assert '<mark class="own-assignment">Examples</mark> / Others' in page
     assert '<mark class="own-assignment">Alex</mark>' in page
+
+
+def test_personal_status_distinguishes_unsent_partial_none_and_clear():
+    app = make_app()
+    client = app.test_client()
+    key, csrf, visitor = setup(client)
+    result = submit(client, key, csrf)
+    assert 'Everyone going' in result.json['statuses'][key]
+    future = next(k for k in result.json['statuses'] if k != key)
+    assert 'Not answered yet' in result.json['statuses'][future]
+    members = app.extensions['attendance'].store.household(visitor)['members']
+    result = submit(client, key, csrf, action='custom', attending=[members[0]['id']])
+    assert 'Some going' in result.json['statuses'][key]
+    assert '<span>Alex</span>' in result.json['statuses'][key]
+    result = submit(client, key, csrf, action='none')
+    assert 'Not going' in result.json['statuses'][key]
+    assert '<span>' not in result.json['statuses'][key]
+    result = submit(client, key, csrf, action='clear')
+    assert 'Not answered yet' in result.json['statuses'][key]
+    page = client.get('/').text
+    assert page.index('Not answered yet', page.index('Another gathering')) < page.index('Can you make it?')
+    assert 'Not answered yet' in client.get('/').text
+
+
+def test_personal_assignments_use_matching_and_exclude_past_canceled_conflicts():
+    source = Source()
+    source.rows[0].update(discussion_leader='Alex / Visitor', food='Examples / Others')
+    source.rows[1].update(childcare='Sam', host='The Examples')
+    source.rows.extend([
+        {'date':'2026-09-01','time':'18:00','discussion_leader':'Alex'},
+        {'date':'2026-10-16','time':'18:00','discussion_leader':'Alex','status':'canceled'},
+        {'date':'2026-10-23','time':'18:00','discussion_leader':'Alex','_date_conflict':True},
+        {'date':'2026-10-23','time':'19:00','discussion_leader':'Alex','_date_conflict':True},
+    ])
+    app = make_app(source)
+    client = app.test_client()
+    key, csrf, _ = setup(client)
+    assert 'Your upcoming assignments' not in client.get('/').text
+    result = submit(client,key,csrf,household='The Examples')
+    overview = result.json['personal_overview']
+    assert '2 meetings' in overview
+    assert 'Discussion leader:</strong> Alex' in overview
+    assert 'Food:</strong> Examples' in overview
+    assert 'Childcare:</strong> Sam' in overview
+    assert 'Host:</strong> The Examples' in overview
+    assert 'Visitor' not in overview and 'Others' not in overview
+    assert 'October 16' not in overview and 'October 23' not in overview and 'September' not in overview
+    assert 'Your upcoming assignments' in client.get('/').text
+    assert 'Your upcoming assignments' not in client.get('/past').text
+    client.post('/household/back',data={'csrf':csrf})
+    assert 'Your upcoming assignments' not in client.get('/').text
+
+
+def test_personal_overview_empty_stale_and_escaped():
+    source = Source()
+    app = make_app(source)
+    client = app.test_client()
+    key, csrf, _ = setup(client)
+    result = submit(client,key,csrf,household='<script>Example</script>')
+    assert 'No upcoming assignments' in result.json['personal_overview']
+    assert '&lt;script&gt;' in result.json['personal_overview']
+    assert '<script>' not in result.json['personal_overview']
+    source.fail = True
+    app.extensions['schedule_cache'].retry_at = float('-inf')
+    assert 'Based on the saved schedule' in client.get('/').text

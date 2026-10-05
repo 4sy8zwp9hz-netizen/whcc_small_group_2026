@@ -51,6 +51,19 @@ The app loads only the project's .env; existing environment variables take prece
   On restart, a failed source refresh shows persisted data with a stale warning.
 
 
+## Personal attendance and assignments
+After selecting or entering a household, each meeting displays its saved response:
+Not answered yet, Everyone going, Some going (with attending names), or Not going.
+The status remains visible above a collapsed attendance form and updates after a
+successful save or clear. Default checked boxes are not treated as a saved response.
+A collapsed **Your upcoming assignments** section below the featured card lists
+matching household responsibilities in date order, with links to meeting cards.
+It includes host/food household aliases and member first/full-name matches using
+existing assignment highlighting rules. Past, canceled and conflicting meetings
+are excluded. Assignments remain visible even if that household answered Not going;
+attendance does not automatically reassign responsibilities. Saved-schedule warnings
+still apply. These views use the browser's selected household, not member accounts.
+
 ## Quick household attendance
 Enter a household name and its members once (comma-separated names, up to 20).
 Choose **All going** or **Not going** to save. On later visits, this browser

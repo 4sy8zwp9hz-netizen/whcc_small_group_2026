@@ -5,9 +5,12 @@ from pathlib import Path
 import re
 import secrets
 import sqlite3
+
 import threading
 
 from flask import jsonify, redirect, render_template, request, session, url_for
+
+from .data import LABELS
 
 
 def assignment_parts(field, value, household):
@@ -224,11 +227,36 @@ class Attendance:
         household = self.store.household(visitor)
         keys = [self.key(meeting) for meeting in meetings]
         backend = self.app.extensions.get("backend")
+        summaries = self.store.summaries(keys, visitor)
+        personal_status = {}
+        upcoming_assignments = []
+        for meeting in sorted(meetings, key=lambda item: item.starts_at):
+            key = self.key(meeting)
+            own = summaries[key]["own"]
+            if household:
+                names = [member["name"] for member in household["members"]
+                         if own is not None and member["id"] in own]
+                label = ("Not answered yet" if own is None else "Not going" if not own
+                         else "Everyone going" if len(names) == len(household["members"])
+                         else "Some going")
+                personal_status[key] = {"label": label, "names": names}
+                if meeting.starts_at >= self.now() and not meeting.canceled and not meeting.date_conflict:
+                    roles = []
+                    for field, label in LABELS.items():
+                        matched = [text.strip() for text, matched in
+                                   assignment_parts(field, getattr(meeting, field), household) if matched]
+                        if matched:
+                            roles.append({"label": label, "names": matched})
+                    if roles:
+                        upcoming_assignments.append({"meeting": meeting, "key": key, "roles": roles})
         return {
+            "personal_status": personal_status,
+            "upcoming_assignments": upcoming_assignments,
+            "personal_schedule_stale": snapshot.stale,
             "sync_pending": backend.status()["pending"] if backend else False,
             "household": household, "csrf": session["csrf"],
             "household_choices": self.roster() if household is None else [],
-            "attendance": self.store.summaries(keys, visitor),
+            "attendance": summaries,
             "attendance_key": self.key,
             "assignment_parts": lambda field, value: assignment_parts(field, value, household),
             "can_respond": lambda meeting: self.allowed(meeting, snapshot),
@@ -298,7 +326,10 @@ class Attendance:
             for meeting in snapshot.meetings
             if meeting.starts_at >= self.now() and not meeting.canceled
         }
-        return jsonify(panels=panels, message=("Response cleared." if action == "clear" else "Attendance saved.")
+        statuses = {self.key(meeting): render_template("_personal_status.html", meeting=meeting, **context)
+                    for meeting in snapshot.meetings}
+        return jsonify(panels=panels, statuses=statuses,
+                       personal_overview=render_template("_personal_overview.html", **context), message=("Response cleared." if action == "clear" else "Attendance saved.")
                        + ("" if synced else " Saved locally; Google sync is pending."))
 
     def back_to_households(self):

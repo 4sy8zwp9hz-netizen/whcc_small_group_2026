@@ -1,0 +1,7 @@
+{% set key = attendance_key(meeting) %}
+<div class="personal-status" data-personal-meeting="{{ key }}" aria-live="polite">
+{% if household and not meeting.canceled %}
+  {% set status = personal_status[key] %}
+  <p><strong>{{ household.name }}: {{ status.label }}</strong>{% if status.names %}<span>{{ status.names|join(', ') }}</span>{% endif %}</p>
+{% endif %}
+</div>

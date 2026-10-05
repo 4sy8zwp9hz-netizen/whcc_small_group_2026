@@ -1,0 +1,15 @@
+<div id="personal-overview">
+{% if household %}
+<details class="personal-overview">
+  <summary>Your upcoming assignments <span class="remembered-household">{{ upcoming_assignments|length }} {{ 'meeting' if upcoming_assignments|length == 1 else 'meetings' }}</span></summary>
+  <p class="subtle">{{ household.name }}</p>
+  {% if personal_schedule_stale %}<p class="rsvp-hint">Based on the saved schedule; check the refresh notice for availability.</p>{% endif %}
+  {% if upcoming_assignments %}<ul class="personal-assignment-list">
+  {% for item in upcoming_assignments %}<li>
+    <a href="#meeting-{{ item.key }}">{{ item.meeting.starts_at|meeting_date }}</a>
+    {% for role in item.roles %}<p><strong>{{ role.label }}:</strong> {{ role.names|join(' / ') }}</p>{% endfor %}
+  </li>{% endfor %}</ul>
+  {% else %}<p>No upcoming assignments for your household.</p>{% endif %}
+</details>
+{% endif %}
+</div>

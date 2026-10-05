@@ -23,6 +23,17 @@ async function saveAttendance(form, action, focusMember) {
       const html = result.panels[panel.dataset.meeting];
       if (html) panel.outerHTML = html;
     });
+    document.querySelectorAll("[data-personal-meeting]").forEach(el => {
+      const html = result.statuses[el.dataset.personalMeeting];
+      if (html) el.outerHTML = html;
+    });
+    const overview = document.getElementById("personal-overview");
+    if (overview) {
+      const open = overview.querySelector("details")?.open;
+      overview.outerHTML = result.personal_overview;
+      const details = document.querySelector("#personal-overview details");
+      if (details && open) details.open = true;
+    }
     status.textContent = result.message;
     const panel = [...document.querySelectorAll(".rsvp-panel")].find(el => el.dataset.meeting === selectedKey);
     if (panel) {

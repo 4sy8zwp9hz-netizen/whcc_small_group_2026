@@ -24,6 +24,7 @@
   <p class="when">{{ meeting.starts_at|meeting_time }} · {{ meeting.location or 'Location to be confirmed' }}</p>
   {% if meeting.canceled %}<p class="cancel-note">This gathering will not take place.</p>{% endif %}
   {% if meeting.date_conflict %}<p class="notes"><strong>Please confirm this date</strong>This meeting has conflicting calendar information. Confirm plans with a group leader.</p>{% endif %}
+  {% include "_personal_status.html" %}
   {% if not meeting.canceled %}
     {% if not featured and not past %}
     <details class="planned-attendance">
@@ -60,6 +61,7 @@
   </aside>
   {% endif %}
   {% if featured_meeting %}{{ card(featured_meeting, true) }}{% endif %}
+  {% if not past %}{% include "_personal_overview.html" %}{% endif %}
   {% if sample %}<p class="demo">Fictional demo schedule · Example names, places, and assignments.</p>{% endif %}
   <nav aria-label="Meeting views">
     <a href="/" {% if not past %}aria-current="page"{% endif %}>Upcoming</a>
