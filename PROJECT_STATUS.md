@@ -1,6 +1,38 @@
 # Project status
 
-Updated: 2026-10-02
+Updated: 2026-10-06
+
+## Current status (supersedes historical entries below)
+The app is live on Google Cloud Run. The owner supplied successful source/Docker
+build and deployment output for revision whcc-small-group-00011-j7b, serving 100%
+of traffic on October 5, after the personal attendance/assignment update (896b204).
+Earlier isolated production-container startup checks also passed in Cloud Shell.
+These are owner-reported operational results, not independent exhaustive live QA.
+
+Current features include remembered household selection/guest setup, individual
+attendance, personal saved status, upcoming assignments/highlights, full admin
+schedule/roster editors, past events off by default, and a separate sync/recovery tab.
+Google Sheets remains authoritative; source calendar reads are read-only and cached
+on demand. Managed backend baselines/events must not be manually edited/sorted.
+Production cache is temporary; confirmed persistence is required for successful writes.
+Group access: default 24 hours or fixed optional 30 days; admin access: 30 minutes.
+Household recognition survives ordinary group logout/expiry on the same hostname.
+
+Latest local validation: 227 tests passed, compilation/whitespace passed, fictional
+browser checks at 375/1440 without horizontal overflow. No code or live configuration
+changed in this October 6 documentation update. Current README supersedes obsolete
+pre-deployment guidance and explains routine Cloud Shell updates.
+
+Next work: check live behavior after each deployment; periodically back up/protect
+managed history; exercise restart/failure/recovery scenarios on an isolated copy;
+monitor quota/latency/cost. Do not infer completed verification from a successful build.
+Cloud deployments/resources, secret changes and live sheet mutations require scope
+in the current request; documentation/code publication does not authorize them.
+
+## Historical implementation log
+Entries below record results and limitations at the time of each change. Earlier
+pending-deployment statements, test counts and UI defaults are historical; use the
+current status above and README for present behavior.
 
 ## Purpose and boundaries
 Original personal project for a WHCC small group. Practice internet-facing deployment

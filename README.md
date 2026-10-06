@@ -1,8 +1,48 @@
 # WHCC small group schedule
 
-A mobile-friendly Flask schedule with household attendance and a leader admin area for a West Houston Christian Church
-small group. Leaders continue editing Google Sheets. The app starts immediately
-with fictional CSV data and needs no Google credentials in demo mode.
+A live, mobile-friendly schedule and household attendance app for a West Houston
+Christian Church small group, built with Flask, Jinja and responsive HTML/CSS.
+Google Sheets is the authoritative backend; no separate frontend build is needed.
+
+**Live on Google Cloud Run:** [Open the group app](https://whcc-small-group-147178794206.us-central1.run.app/).
+The website requires the group's shared password. Leader tools require a separate
+admin password; a public source repository does not make group information public.
+
+## What members and leaders can do
+- See this week's gathering first, with Central time, location, topic, assignments
+  and notes, followed by chronological upcoming meetings and a separate past view.
+- Choose an existing household, or expand **New household or visiting guest?** and
+  submit names. Guests start going; remembered households can select individual
+  people, mark everyone/not going, or clear a response. A back button changes selection.
+- See saved personal attendance status even with **Can you make it?** collapsed.
+  Unanswered meetings stay unanswered until a response is submitted.
+- Expand **Your upcoming assignments** below the featured card to find household
+  responsibilities and jump to the meeting. Matching assignment names are highlighted.
+- Use the leader admin to edit all schedule fields, manage households/members and
+  correct attendance. Member roles have roster selectors; food/host have household
+  selectors. Past events are hidden by default in admin.
+- Open **Backend sync and recovery** for persistence status, refresh/retry and
+  safeguarded repair tools. Leave the machine-managed backend sheet untouched.
+
+Group access lasts 24 hours by default, or a fixed 30 days with **Remember this
+device** checked. Admin access lasts 30 minutes independently. The browser remembers
+a household for up to a year, including after ordinary group logout/expiry; it is
+not a verified individual account. Cookies depend on the browser, hostname and
+stable signing key.
+
+## Current release and verification
+Documentation updated October 6, 2026 for application commit `896b204`.
+The owner supplied a successful Docker/source deployment result for Cloud Run
+revision `whcc-small-group-00011-j7b`, serving 100% of traffic on October 5.
+Docker build and isolated production startup also passed in the owner's Cloud Shell.
+Latest local validation: **227 passing tests**, compilation and whitespace checks,
+and fictional-data browser checks at 375 px and 1440 px without horizontal overflow.
+These results are not a claim of exhaustive live production verification: ongoing
+live persistence, restart recovery and operational checks remain part of maintenance.
+
+Cloning locally starts with fictional CSV data and needs no Google credentials.
+Private configuration, passwords, keys, rosters and real sheet identifiers are
+excluded from this public repository.
 
 ## Windows setup
 Install Python 3.12 or newer and Git. In PowerShell, from your personal projects folder:
@@ -65,8 +105,10 @@ attendance does not automatically reassign responsibilities. Saved-schedule warn
 still apply. These views use the browser's selected household, not member accounts.
 
 ## Quick household attendance
-Enter a household name and its members once (comma-separated names, up to 20).
-Choose **All going** or **Not going** to save. On later visits, this browser
+Choose an existing household, or enter a household name and its members once
+(comma-separated names, up to 20) in the collapsed guest/new-household section.
+Its **Submit** button marks everyone entered as going. Existing households use
+**All going**, **Not going**, or individual selections. On later visits, this browser
 remembers the household. Everyone starts checked for each unanswered gathering;
 nothing is counted until someone submits or changes a checkbox. Uncheck anyone
 who cannot come and the change saves immediately. Without JavaScript, use
@@ -80,8 +122,9 @@ validated. Each response rereads the backend, checks the latest meeting and requ
 confirmed Sheets persistence. Unreadable backend data still blocks responses.
 
 A signed, HttpOnly, SameSite=Lax cookie remembers a random household identifier
-for up to a year. Names and responses stay out of the cookie. They are stored in
-the private SQLite database and, when enabled, mirrored into the App Backend tab. The default database is private/attendance.sqlite3;
+for up to a year. Names and responses stay out of the cookie. In production,
+the App Backend tab is authoritative and SQLite is a temporary cache. In local
+development, SQLite persists data and can queue changes for Google synchronization. The default database is private/attendance.sqlite3;
 a locally generated signing secret persists in private/session.key. Both are
 ignored by Git. Back up these files privately together to preserve local attendance.
 Cloning source code does not transfer attendance or remembered households.
@@ -123,7 +166,8 @@ REQUIRED_ASSIGNMENTS=discussion_leader,host,food
 ```
 This makes blank childcare optional. Python strptime format strings are used.
 The Google adapter requests formatted cell values, so match formats to the actual
-sheet display and locale. No real sheet column names have been assumed.
+sheet display and locale. Examples use generic headers; the live mapping remains
+in private runtime configuration.
 Set the Google spreadsheet's own time zone to Central Time as well.
 
 For a private local CSV, store it under private/ and set CSV_PATH=private/schedule.csv.
@@ -231,7 +275,7 @@ Creation refuses to replace an existing tab. A fresh clone with an empty local
 database restores existing app records automatically from the backend; do not
 re-run initialization against a tab that already exists.
 
-The backend has one row per meeting: normalized date/time, assignments, notes,
+The backend baseline has one row per meeting: normalized date/time, assignments, notes,
 status, attendance counts, and conflict flags. Its hidden final column holds the
 structured state needed for restoration, including household members and responses.
 Hiding a column is only a layout choice, not access control. No passwords, service
@@ -285,12 +329,14 @@ the log grows with use and is reread on refresh. New version-two updates contain
 only changed schedule records, changed household profiles, and individual response
 updates/clear operations. Profiles are not copied into every RSVP event. The reader
 still accepts legacy meeting baselines and version-one events; no live migration
-or baseline replacement is needed. Old versions cannot read version-two events. Compaction is a future maintenance
-feature and must only happen offline with all writers stopped and a verified backup.
+or baseline replacement is needed. Old versions cannot read version-two events. Explicit backed-up rebuilding is available at `/admin/recovery/rebuild`; normal
+operation never replaces the full tab. Stop competing writers and manual edits
+before repair, and keep the verified backup.
 
 Fresh instances restore schedule overrides, profiles/members and responses from the
 backend before reading the source calendar. A source outage preserves that restored
-schedule with a stale warning and disables RSVP. If the backend cannot be read and no
+schedule with a stale warning. Upcoming confirmed meetings can still accept RSVP
+when saved backend data was verified; each write still requires confirmed persistence. If the backend cannot be read and no
 cache exists, show the unavailable state. Browser identity survives only with the same
 cookie and stable signing key. Shared group/admin passwords are separate; cookies
 identify browsers, not verified people. Restrict the spreadsheet's own sharing too:
@@ -298,8 +344,9 @@ website login does not protect a sheet shared with anyone who has its link.
 
 ## Continue with Codex
 Read AGENTS.md, README.md, and PROJECT_STATUS.md first. Run the validation commands,
-then resolve the next recorded task within the agreed scope. Do not deploy publicly
-or introduce real group information until website access has been decided.
+then resolve the next recorded task within the agreed scope. The app is already
+live; code publication does not authorize cloud changes, deployment, secret rotation
+or live spreadsheet mutation. Confirm the scope of the current request.
 
 ## Two-row calendar layout
 The optional calendar reader supports a school-year calendar with month/day dates,
@@ -372,10 +419,33 @@ notes, ignored columns, malformed refreshes, and the authenticated adapter contr
 
 ## Google Cloud Run Deployment
 
-Preparation only: no cloud resources or deployment have been performed. Manual
-source deployment uses this Dockerfile through Cloud Build. There is no CI/CD,
+The app is live on Cloud Run. Manual source deployment uses this Dockerfile
+through Cloud Build. The first-time setup reference below is for a new environment;
+do not repeat project creation or secret preparation for routine updates. There is no CI/CD,
 SQL database, Redis, or persistent disk. Later GitHub automation can reuse these
-commands through Workload Identity Federation, after manual deployment works.
+commands through Workload Identity Federation if automated deployment is later authorized.
+
+### Update the existing service from Cloud Shell (Bash)
+Run inside the existing repository checkout, not Cloud Shell's home folder.
+Pulling GitHub does not deploy; deploying does not pull GitHub automatically.
+Keep each command on one line to avoid losing Bash continuation backslashes.
+
+```bash
+cd ~/whcc-cloudrun-3f3b861
+git pull --ff-only origin main
+git log -1 --oneline
+BUILD_SA=$(gcloud run services describe whcc-small-group --project=whcc-small-group --region=us-central1 --format="value(metadata.annotations.'run.googleapis.com/build-service-account')")
+if [ -n "$BUILD_SA" ]; then
+  gcloud run deploy whcc-small-group --source . --project=whcc-small-group --region=us-central1 --build-service-account="$BUILD_SA"
+else
+  echo "Stop: build service account was not found."
+fi
+```
+Stop on a failed pull or service lookup. The directory above is the owner's existing
+Cloud Shell checkout; use your actual checkout path on another machine. This update
+reuses existing runtime configuration and secret references. Do not regenerate the
+signing key or reinitialize the backend. Confirm the successful revision and traffic
+output, then refresh the website and check the changed behavior.
 
 ### 1. Install CLI, select project and billing (you perform these steps)
 Install the [Google Cloud CLI for Windows](https://docs.cloud.google.com/sdk/docs/install).
@@ -496,7 +566,7 @@ TRUST_PROXY: "true"
 ```
 The App Backend must already exist. For a fresh sheet, use the documented local
 `init-sheet-backend` CLI with private local credentials; it refuses to replace an
-existing tab. No creation/migration of the real backend was performed in this task.
+existing tab. Do not initialize or migrate the existing live backend for routine code updates.
 Back up its full contents and stop all older writers before the first deployment.
 
 ### 5. Review upload, then manually deploy
@@ -621,7 +691,8 @@ No GOOGLE_SERVICE_ACCOUNT_JSON mechanism existed in this checkout; none was adde
 Authentication is lazy, so startup and /health require no Sheets request.
 
 ### Optional container verification at home
-Docker was unavailable on the preparation workstation. With Docker Desktop using
+The owner reports successful Cloud Shell Docker build/isolated startup checks.
+For independent verification on another computer with Docker Desktop using
 Linux containers, this fictional configuration exercises startup/health without a
 real credential or any Sheets request. Generate an ignored `.env.container-test`
 with fictional long SECRET_KEY, password hashes (not plaintext), APP_ENV=production,
@@ -660,7 +731,7 @@ Do not pass real credentials for this build/health check.
    answers, overrides and clear behavior. Equivalent quoted/unquoted A1 spellings
    retain restored IDs. If duplicate existing source dates/scopes are found, stop
    and reconcile them; do not select an arbitrary record. Enable controlled use
-   only after verification and the outstanding container/Cloud Run checks.
+   only after verification and the container/live checks appropriate to that migration.
 5. **Restore only with all writers stopped and drained.** Preserve the damaged tab
    separately, restore a verified complete backup (never just visible columns),
    clear/recreate the ephemeral production cache, and test restoration with the
@@ -689,14 +760,12 @@ compaction is implemented; do not delete rows to shorten the log while writers r
 Manual backup/recovery is preferable to adding infrastructure for this scope.
 
 ### Current verification
-The combined reliability fixes and remembered group login are reviewed for
-publication on main under explicit owner authorization. No live sheet/cloud changes
-or deployment were performed. Tests cover independent admin/RSVP
-writers with synchronized append barriers, stale rejection/retry, quota-sized bursts,
-429 handling, delayed unknown acceptance, empty-cache cookie recovery, large rosters,
-source identity, per-browser throttling, and explicit signing-key migration.
-Docker is not installed/on PATH here; actual image execution as UID 10001, runtime
-ADC and real managed-HTTPS verification remain outstanding before deployment.
+See **Current release and verification** above for the latest test and deployment
+status. Automated tests cover independent writers, stale rejection, bounded retries,
+unknown acknowledgments, empty-cache recovery, large rosters, source identity,
+login throttling and signing-key migration. The local workstation lacked Docker;
+the owner subsequently completed container checks and deployed from Cloud Shell.
+Live failure/recovery scenarios have not all been independently exercised.
 
 
 ## Remembering group access
@@ -728,14 +797,13 @@ Validation before publication: baseline 136 tests, final
 mocked durable storage. Login inspected at 375 and 1440 pixels without horizontal
 overflow; label tapping, keyboard Tab/Space, and native submission verified. The
 login loads no scripts and native login also succeeded with all scripts blocked by
-a preview-only Content-Security-Policy (script-src 'none'). Docker is unavailable; actual image execution,
-Cloud Run ADC and managed HTTPS verification remain outstanding. No live Sheets or
-cloud changes or deployment were performed. The owner subsequently authorized
-staging, committing and pushing the reviewed project changes to main.
+a preview-only Content-Security-Policy (script-src 'none'). These are historical
+login-feature validation results; current overall validation and owner-reported
+container/deployment status appear at the top of this README.
 
 
 ## Admin recovery for incomplete backend rows
-If the Google backend cannot be validated, admin home remains reachable and offers
+If the Google backend cannot be validated, admin home remains reachable. Its **Backend sync and recovery** tab offers
 **Check backend and recover incomplete rows** at /admin/recovery. The preview is
 read-only. It identifies populated managed rows that have neither a meeting ID nor
 stored app state. Every retained baseline, visible cell and update event must pass
