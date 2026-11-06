@@ -54,14 +54,19 @@ not a verified individual account. Cookies depend on the browser, hostname and
 stable signing key.
 
 ## Current release and verification
-Documentation updated October 6, 2026 for application commit `896b204`.
-The owner supplied a successful Docker/source deployment result for Cloud Run
-revision `whcc-small-group-00011-j7b`, serving 100% of traffic on October 5.
-Docker build and isolated production startup also passed in the owner's Cloud Shell.
-Latest local validation: **227 passing tests**, compilation and whitespace checks,
-and fictional-data browser checks at 375 px and 1440 px without horizontal overflow.
-These results are not a claim of exhaustive live production verification: ongoing
-live persistence, restart recovery and operational checks remain part of maintenance.
+Application commit `b51cc6f` is live on Cloud Run revision
+`whcc-small-group-00012-pkl`, deployed to 100% of traffic. The group leader
+confirmed that the original calendar refreshed, the saved-schedule banner cleared,
+and both custom sermon titles appeared in the app.
+
+**For calendar editors:** Enter a custom sermon title in column A of the original
+calendar on a continuation row beneath the meeting date (for example,
+`Sermon Series: Hope 1/2`). Keep the date on its own row. The title appears on that
+meeting in the app; no configuration change is needed.
+
+Latest local validation: **233 passing tests**, compilation and whitespace checks.
+Earlier fictional-data browser checks passed at 375 px and 1440 px without
+horizontal overflow.
 
 Cloning locally starts with fictional CSV data and needs no Google credentials.
 Private configuration, passwords, keys, rosters and real sheet identifiers are

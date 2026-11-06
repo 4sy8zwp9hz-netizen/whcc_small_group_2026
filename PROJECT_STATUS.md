@@ -3,11 +3,10 @@
 Updated: 2026-11-06
 
 ## Current status (supersedes historical entries below)
-The app is live on Google Cloud Run. The owner supplied successful source/Docker
-build and deployment output for revision whcc-small-group-00011-j7b, serving 100%
-of traffic on October 5, after the personal attendance/assignment update (896b204).
-Earlier isolated production-container startup checks also passed in Cloud Shell.
-These are owner-reported operational results, not independent exhaustive live QA.
+The app is live on Google Cloud Run. Application commit `b51cc6f` deployed as
+revision `whcc-small-group-00012-pkl` with 100% of traffic. After deployment, the
+group leader confirmed a successful refresh: the saved-schedule banner cleared
+and both custom sermon titles appeared in the app.
 
 Current features include remembered household selection/guest setup, individual
 attendance, personal saved status, upcoming assignments/highlights, full admin
@@ -18,10 +17,8 @@ Production cache is temporary; confirmed persistence is required for successful 
 Group access: default 24 hours or fixed optional 30 days; admin access: 30 minutes.
 Household recognition survives ordinary group logout/expiry on the same hostname.
 
-Latest local validation: 227 tests passed, compilation/whitespace passed, fictional
-browser checks at 375/1440 without horizontal overflow. No code or live configuration
-changed in this October 6 documentation update. Current README supersedes obsolete
-pre-deployment guidance and explains routine Cloud Shell updates.
+Latest local validation: 233 tests passed, plus compilation and whitespace checks.
+Earlier fictional-data browser checks at 375/1440 showed no horizontal overflow.
 
 Next work: check live behavior after each deployment; periodically back up/protect
 managed history; exercise restart/failure/recovery scenarios on an isolated copy;
@@ -29,15 +26,13 @@ monitor quota/latency/cost. Do not infer completed verification from a successfu
 Cloud deployments/resources, secret changes and live sheet mutations require scope
 in the current request; documentation/code publication does not authorize them.
 
-## Flexible source-calendar topics
-Continuation rows now accept free-form topic text in the date column, including
-series titles with subtitles, without changing the topic-label configuration.
-Valid dates still start separate meetings. Malformed date-like text is rejected
-with its row number within the selected range, protecting the preceding meeting
-from a silent merge. Explicit topic labels remain available for date-like titles.
-No live calendar, backend, or Cloud Run settings were changed. Local validation:
-233 tests, compilation and whitespace checks passed. Redeploy from Cloud Shell
-and retry calendar refresh in the admin to verify the fix against the live source.
+## Flexible source-calendar topics (live)
+Leaders can enter custom sermon titles in column A of the original calendar on a
+continuation row beneath a dated meeting. The app displays the full title for that
+meeting without a topic-label configuration change. Valid dates still start new
+meetings. Malformed date-like entries report their row within the selected range;
+explicit topic labels remain available for titles that look like dates.
+The production refresh and title display were verified by the group leader.
 
 ## README screenshots and refresh guidance (2026-11-06)
 Added reviewed screenshots of the phone RSVP view, desktop assignment overview,
