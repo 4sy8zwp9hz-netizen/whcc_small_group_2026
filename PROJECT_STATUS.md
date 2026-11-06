@@ -1,6 +1,6 @@
 # Project status
 
-Updated: 2026-10-06
+Updated: 2026-11-06
 
 ## Current status (supersedes historical entries below)
 The app is live on Google Cloud Run. The owner supplied successful source/Docker
@@ -28,6 +28,12 @@ managed history; exercise restart/failure/recovery scenarios on an isolated copy
 monitor quota/latency/cost. Do not infer completed verification from a successful build.
 Cloud deployments/resources, secret changes and live sheet mutations require scope
 in the current request; documentation/code publication does not authorize them.
+
+## README screenshots and refresh guidance (2026-11-06)
+Added reviewed screenshots of the phone RSVP view, desktop assignment overview,
+and leader editor. Captured from the local app with fictional rows and in-memory
+attendance only. Added guidance for the saved-schedule banner and admin retry.
+No application code, live spreadsheet, or Cloud Run settings changed.
 
 ## Historical implementation log
 Entries below record results and limitations at the time of each change. Earlier

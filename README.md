@@ -8,6 +8,29 @@ Google Sheets is the authoritative backend; no separate frontend build is needed
 The website requires the group's shared password. Leader tools require a separate
 admin password; a public source repository does not make group information public.
 
+## App screenshots
+
+Captured from the running app with fictional names, meetings, and locations.
+
+**Phone view:** this week's card shows the household's saved response, individual
+attendance controls, and highlighted assignments.
+
+<img src="docs/screenshots/whcc-mobile.jpg" width="320" alt="Phone view showing some household members going, individual attendance controls, and highlighted assignments">
+
+<details>
+<summary>Desktop schedule and upcoming assignments</summary>
+
+![Desktop schedule with an expanded list of upcoming household assignments and a future attendance card](docs/screenshots/whcc-desktop.jpg)
+
+</details>
+
+<details>
+<summary>Leader schedule editor</summary>
+
+![Leader admin showing meeting edit cards, assignment selectors, and links to household management and backend sync](docs/screenshots/whcc-admin.jpg)
+
+</details>
+
 ## What members and leaders can do
 - See this week's gathering first, with Central time, location, topic, assignments
   and notes, followed by chronological upcoming meetings and a separate past view.
@@ -301,6 +324,15 @@ account keys, session secrets, or raw browser identity tokens are sent to Sheets
   The admin UI edits existing meetings and can cancel them; it has no delete button.
 
 ### Writes, outages, and recovery
+
+If the app says **Showing the saved schedule** and attendance is still available,
+the original calendar refresh failed but saved backend data was verified. Recent
+calendar edits may be missing. Open **Leader admin → Backend sync and recovery**,
+choose **Refresh calendar and retry sync**, then check the message under
+**Calendar refresh is delayed** if it persists. Check the source tab name, range,
+sharing, and recent date/layout edits as indicated by the error. A source refresh
+failure alone is not a reason to edit or rebuild App Backend.
+
 Development mode retains local SQLite and queues failed syncs; preserve the database
 until pending writes finish. Production (`APP_ENV=production`) treats SQLite as an
 ephemeral cache. Every write refreshes the durable backend under a process lock and
