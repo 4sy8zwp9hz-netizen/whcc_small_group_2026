@@ -83,6 +83,30 @@ def test_invalid_date_rejects_refresh_instead_of_becoming_a_topic():
         layout()([HEADERS, ["Septembr 6", "Example host"]])
 
 
+def test_freeform_topics_keep_dates_and_assignments_separate():
+    first, second = parse(layout()([
+        HEADERS,
+        ["November 1", "First household", "Alex"],
+        ["Sermon Series: Hope 1/2", "", "Sam"],
+        ["November 8", "Second household", "Jordan"],
+        ["Romans 8: Life in the Spirit", "", "Casey"],
+        ["Roles"],
+        ["Not a meeting", "Ignored"],
+    ]))
+    assert first.starts_at.date().isoformat() == "2030-11-01"
+    assert first.topic == "Sermon Series: Hope 1/2"
+    assert first.food == "Alex / Sam"
+    assert second.starts_at.date().isoformat() == "2030-11-08"
+    assert second.topic == "Romans 8: Life in the Spirit"
+    assert second.food == "Jordan / Casey"
+
+
+@pytest.mark.parametrize("bad_date", ["November 31", "Novembr 8", "11/8/2030", "2030-11-08", "November 8, 2030"])
+def test_date_like_errors_do_not_merge_meeting_into_previous_date(bad_date):
+    with pytest.raises(DataError, match=r"Calendar row 4 .*month name and day"):
+        layout()([HEADERS, ["November 1"], ["Sermon Series"], [bad_date, "Second household"]])
+
+
 def test_renamed_headers_and_configurable_date_column():
     mapping = {**MAPPING, "food": "Meal"}
     changed = [*HEADERS]

@@ -29,6 +29,16 @@ monitor quota/latency/cost. Do not infer completed verification from a successfu
 Cloud deployments/resources, secret changes and live sheet mutations require scope
 in the current request; documentation/code publication does not authorize them.
 
+## Flexible source-calendar topics
+Continuation rows now accept free-form topic text in the date column, including
+series titles with subtitles, without changing the topic-label configuration.
+Valid dates still start separate meetings. Malformed date-like text is rejected
+with its row number within the selected range, protecting the preceding meeting
+from a silent merge. Explicit topic labels remain available for date-like titles.
+No live calendar, backend, or Cloud Run settings were changed. Local validation:
+233 tests, compilation and whitespace checks passed. Redeploy from Cloud Shell
+and retry calendar refresh in the admin to verify the fix against the live source.
+
 ## README screenshots and refresh guidance (2026-11-06)
 Added reviewed screenshots of the phone RSVP view, desktop assignment overview,
 and leader editor. Captured from the local app with fictional rows and in-memory

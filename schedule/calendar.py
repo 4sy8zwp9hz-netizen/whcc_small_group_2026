@@ -2,11 +2,27 @@
 
 This module contains layout rules, not a real spreadsheet ID or group information.
 """
+from calendar import month_abbr, month_name
 from collections import Counter
 from datetime import date, datetime
+from difflib import get_close_matches
 import re
 
 from .data import ASSIGNMENTS, FIELDS, DataError, HeaderRows
+
+
+MONTH_LABELS = {label.casefold() for label in (*month_name, *month_abbr) if label}
+
+
+def looks_like_date(text):
+    """Keep malformed dates from silently becoming a preceding meeting's topic."""
+    if re.match(r"^\d+(?:$|[./-]\s*\d)", text):
+        return True
+    match = re.match(r"^(?:[A-Za-z]+,\s*)?([A-Za-z]+)\.?\s+\d", text)
+    if not match:
+        return False
+    month = match[1].casefold()
+    return month in MONTH_LABELS or bool(get_close_matches(month, MONTH_LABELS, n=1, cutoff=.8))
 
 
 def column_index(column):
@@ -70,7 +86,7 @@ class CalendarLayout:
 
         groups = []
         current = None
-        for row in table[1:]:
+        for row_number, row in enumerate(table[1:], start=2):
             cells = [str(value).strip() for value in row]
             if not any(cells):
                 continue
@@ -78,15 +94,20 @@ class CalendarLayout:
             if label.casefold() == self.end_marker:
                 break
             if label and label.casefold() not in self.topic_labels:
-                day = self.meeting_date(label)
-                current = {"day": day, "rows": [cells], "topics": []}
-                groups.append(current)
-            elif current is None:
-                raise DataError("Calendar continuation row has no meeting date.")
-            else:
-                current["rows"].append(cells)
-                if label:
-                    current["topics"].append(label)
+                try:
+                    day = self.meeting_date(label)
+                except DataError as exc:
+                    if current is None or looks_like_date(label):
+                        raise DataError(f"Calendar row {row_number} in the selected range: {exc}") from None
+                else:
+                    current = {"day": day, "rows": [cells], "topics": []}
+                    groups.append(current)
+                    continue
+            if current is None:
+                raise DataError(f"Calendar row {row_number} in the selected range has no meeting date.")
+            current["rows"].append(cells)
+            if label:
+                current["topics"].append(label)
 
         normalized = []
         for group in groups:

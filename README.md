@@ -418,9 +418,11 @@ Start that configuration explicitly:
   Update the year/range deliberately when rolling to a new school year.
 - CALENDAR_START_TIME is required, in 24-hour HH:MM Central Time, and applies to
   every gathering. It must be confirmed by a leader, not inferred from bare times.
-- A date row starts a meeting. A continuation row with a blank date or an allowed
-  topic label adds assignments to that meeting. Distinct names are joined with " / ".
-  If the topic label changes, update CALENDAR_TOPIC_LABELS_JSON.
+- A valid date starts a meeting. On continuation rows, the date column can be blank
+  or contain a free-form topic, such as `Sermon Series: Hope 1/2`. It belongs to the
+  preceding dated meeting, along with any assignments on that row. Distinct values
+  are joined with " / ". No configuration change is needed for new titles.
+  `CALENDAR_TOPIC_LABELS_JSON` remains available for explicit labels that look like dates.
 - An event title in the configured event column becomes the topic when there are
   no mapped assignments or continuation topics. Off/break/canceled event titles
   are treated as no-meeting weeks. Social events do not show missing role warnings.
@@ -428,8 +430,10 @@ Start that configuration explicitly:
   mistaken for meetings. Ensure the requested range includes every meeting.
 - Optional mapped notes are included. All unmapped columns are discarded during
   normalization and never rendered. The reader does not read other tabs.
-- Unexpected date labels or changed required headers fail the whole refresh,
-  preserving the last successful schedule. Color and strikethrough are not status
+- Malformed date-like entries (such as numeric dates or impossible month/day dates),
+  topics before the first meeting, and changed required headers fail the refresh,
+  preserving the last successful schedule. Date errors include the row within the
+  selected range. Color and strikethrough are not status
   signals; the reader uses cell text only.
 - Duplicate dates are preserved and visibly flagged. For a leader-confirmed off
   date, set CALENDAR_CANCELED_DATES to comma-separated ISO dates. Each explicit
