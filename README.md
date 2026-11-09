@@ -140,7 +140,10 @@ Its **Submit** button marks everyone entered as going. Existing households use
 remembers the household. Everyone starts checked for each unanswered gathering;
 nothing is counted until someone submits or changes a checkbox. Uncheck anyone
 who cannot come and the change saves immediately. Without JavaScript, use
-**Save selection**. The attendance summary expands to show who is coming.
+**Save selection**. Expand the attendance summary to see who is going and who is
+not attending, grouped by household. The not-attending list includes current roster
+members left off a saved household response; unanswered and cleared responses are
+excluded.
 
 Responses are per gathering. Repeated taps update the same response. **Clear
 response** removes that gathering's answer while keeping the remembered household.

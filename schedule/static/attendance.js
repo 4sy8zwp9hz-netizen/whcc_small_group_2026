@@ -21,7 +21,13 @@ async function saveAttendance(form, action, focusMember) {
     const selectedKey = form.closest(".rsvp-panel").dataset.meeting;
     document.querySelectorAll(".rsvp-panel").forEach(panel => {
       const html = result.panels[panel.dataset.meeting];
-      if (html) panel.outerHTML = html;
+      if (!html) return;
+      const expanded = panel.querySelector(".attendance-summary")?.open;
+      const replacement = document.createElement("template");
+      replacement.innerHTML = html;
+      const summary = replacement.content.querySelector(".attendance-summary");
+      if (summary && expanded) summary.open = true;
+      panel.replaceWith(replacement.content);
     });
     document.querySelectorAll("[data-personal-meeting]").forEach(el => {
       const html = result.statuses[el.dataset.personalMeeting];

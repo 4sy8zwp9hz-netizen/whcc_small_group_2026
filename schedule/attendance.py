@@ -136,7 +136,8 @@ class AttendanceStore:
 
     def summaries(self, meeting_ids, visitor):
         visitor = self.identity(visitor)
-        result = {key: {"own": None, "going": [], "not_going": 0, "people": 0}
+        result = {key: {"own": None, "going": [], "not_going": 0, "people": 0,
+                        "not_attending": [], "not_attending_people": 0}
                   for key in meeting_ids}
         if not result:
             return result
@@ -153,13 +154,18 @@ class AttendanceStore:
             attending = json.loads(row["attending"])
             if row["household_id"] == visitor:
                 summary["own"] = attending
-            names = [member["name"] for member in json.loads(row["members"])
-                     if member["id"] in attending]
+            names, absent = [], []
+            selected = set(attending)
+            for member in json.loads(row["members"]):
+                (names if member["id"] in selected else absent).append(member["name"])
             if names:
                 summary["going"].append({"household": row["name"], "names": names})
                 summary["people"] += len(names)
             else:
                 summary["not_going"] += 1
+            if absent:
+                summary["not_attending"].append({"household": row["name"], "names": absent})
+                summary["not_attending_people"] += len(absent)
         return result
 
 

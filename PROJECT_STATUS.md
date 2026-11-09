@@ -1,6 +1,6 @@
 # Project status
 
-Updated: 2026-11-06
+Updated: 2026-11-09
 
 ## Current status (supersedes historical entries below)
 The app is live on Google Cloud Run. Application commit `b51cc6f` deployed as
@@ -25,6 +25,15 @@ managed history; exercise restart/failure/recovery scenarios on an isolated copy
 monitor quota/latency/cost. Do not infer completed verification from a successful build.
 Cloud deployments/resources, secret changes and live sheet mutations require scope
 in the current request; documentation/code publication does not authorize them.
+
+## Not-attending names (2026-11-09)
+Meeting attendance details show a not-attending count and names grouped by
+household, including unchecked members from a partial response. This uses the
+current roster and saved household response; unanswered and cleared responses
+are excluded. The list stays open and updates after a successful RSVP save.
+No storage changes or migration. Local validation: 234 tests passed, Python and
+JavaScript checks passed, and fictional RSVP flows and layout checked at 375 and
+1440 pixels. Cloud Run redeployment is required for this update.
 
 ## Flexible source-calendar topics (live)
 Leaders can enter custom sermon titles in column A of the original calendar on a

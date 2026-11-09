@@ -120,6 +120,36 @@ def test_separate_browsers_have_independent_households():
     assert summary["people"] == 1 and summary["not_going"] == 1
 
 
+def test_group_sees_names_not_attending_only_for_saved_responses():
+    app = make_app()
+    household, observer = app.test_client(), app.test_client()
+    key, csrf, visitor = setup(household)
+    store = app.extensions["attendance"].store
+    store.save("unanswered", "another-meeting", "all", "Other family", "Unanswered", [], NOW.isoformat())
+
+    def attendance_details(html):
+        return html.split('<details class="attendance-summary">', 1)[1].split("</details>", 1)[0]
+
+    submit(household, key, csrf, people="Alex, <Sam>")
+    assert "Not attending" not in attendance_details(observer.get("/").text)
+    member = store.household(visitor)["members"][0]["id"]
+    result = submit(household, key, csrf, "custom", attending=member)
+    partial = attendance_details(result.json["panels"][key])
+    assert "1 not attending" in partial
+    going, not_attending = partial.split("<strong>Not attending</strong>")
+    assert "Alex" in going and "&lt;Sam&gt;" not in going
+    assert "&lt;Sam&gt;" in not_attending and "<Sam>" not in not_attending
+    assert "Alex" not in not_attending and "Unanswered" not in partial
+    assert attendance_details(observer.get("/").text) == partial
+
+    submit(household, key, csrf, "none")
+    declined = attendance_details(observer.get("/").text)
+    assert "0 people going" in declined and "2 not attending" in declined
+    assert "Example family</strong>: Alex, &lt;Sam&gt;" in declined
+    submit(household, key, csrf, "clear")
+    assert "not attending" not in attendance_details(observer.get("/").text).lower()
+
+
 @pytest.mark.parametrize("token", ["", "bad-token", "\u2603"])
 def test_csrf_required_and_invalid_tokens_never_write(token):
     app = make_app()
